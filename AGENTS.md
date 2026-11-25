@@ -4,7 +4,21 @@ This file provides guidance to coding agents (Claude Code and others) when worki
 
 ## Status
 
-Greenfield. The repo currently contains only `development_plan.md` (the source of truth for scope, phases and checklist) — no code yet (git repo initialized on `main`). Update this file once real build/run/test commands exist; don't invent them before then.
+`development_plan.md` is the source of truth for scope, phases and checklist. Phases 0–3 are done; `/ask` (Phase 4) is next.
+
+## Commands
+
+```sh
+python3 -m unittest discover -s tests -t .                       # all tests (local; fakes, no network)
+python3 -m unittest tests.test_ingest.IngestTest.test_second_run_is_a_no_op   # one test
+./scripts/deploy.sh                                              # push *.py to the Sprite and restart the service
+./scripts/set-token.sh                                           # create ROOST_TOKEN in .env (if missing), install its hash on the Sprite
+curl -X POST -H "X-Roost-Token: $ROOST_TOKEN" https://roost-b6xbd.sprites.app/ingest   # run ingest
+```
+
+**Auth:** `/ingest` (and `/ask`) require the `X-Roost-Token` header. The token lives only in the local `.env`; the Sprite keeps just its SHA-256 in `data/token.sha256` and fails closed (503) without it. `/` and `/healthz` are open.
+
+The gateway only works from inside the Sprite, so anything that touches Box or Pinecone must run there (`sprite exec --no-stdin -- sh -c 'cd /home/sprite/roost && python3 ...'`). Local Python is 3.9; the Sprite has 3.13, so keep code 3.9-compatible.
 
 ## What roost is
 
@@ -16,7 +30,9 @@ Deadline: midnight PST Sun Nov 29 2026 (08:00 WAT Mon Nov 30). Sprite + connecto
 
 Single service, two endpoints:
 
-- `POST /ingest` — Box connector → list files, fetch text for supported types → upsert into Pinecone index `roost` using **Pinecone hosted embeddings** (`llama-text-embed-v2`, text in field `chunk_text`), one namespace. Source docs are in Box folder `roost/`; skip types stdlib can't read. A cursor in `nest.json` on the persistent filesystem makes re-ingest incremental; running it twice must add nothing the second time.
+Modules: `auth.py` (shared-secret check), `gateway.py` (connection discovery + keyless HTTP), `box.py`, `nest.py` (Pinecone), `ingest.py` (chunking + sync logic), `service.py` (HTTP).
+
+- `POST /ingest` — lists Box folder `roost/`, downloads `.md`/`.markdown`/`.txt` files, splits them into heading-prefixed chunks (≤1200 chars), embeds them through the connector's `/embed` (`llama-text-embed-v2`, 1024 dims), and upserts plain vectors to Pinecone index **`roost-nest`**, namespace `me`. Vector ids are `<box_file_id>#<chunk_index>`; metadata holds `file_id`, `file_name`, `chunk_index`, `chunk_text`, `modified_at`. `data/nest.json` (on the Sprite, gitignored) records each file's Box `sha1`, name and chunk count: unchanged files are skipped, changed files are re-embedded and their surplus chunk ids deleted, and files gone from Box have all their chunks deleted. A lock returns 409 if an ingest is already running.
 - `GET /ask?q=...` — Pinecone top-k query → typed decision from `q` + context with a fixed output schema, e.g. `{ answered: bool, source_file: str, category: enum, priority: enum, next_action: enum }` → return the JSON plus a one-line template rendered from the typed fields. The engine *decides*; a template phrases it — no free-form prose generation. Each answer is appended under `history/`.
 
 **Decision engine:** a rules template, no model. It fills the schema from the retrieved matches (scores, metadata, keywords).
@@ -46,4 +62,6 @@ sprite exec --no-stdin -- curl -s https://api.sprites.dev/v1/gateway/list       
 sprite checkpoint create --comment "MVP working"
 ```
 
-Connectors (Box, Pinecone) are granted in the Fly dashboard to the label `env=hacksgiving`; they are default-deny. The Pinecone connector can't create indexes (403); do that in the Pinecone console.
+Connectors (Box, Pinecone) are granted in the Fly dashboard to the label `env=hacksgiving`; they are default-deny.
+
+**Pinecone connector limits:** it forwards `/embed` and the vectors API (`/indexes/<name>/vectors/upsert`, `/vectors/delete`, `/query`, `/describe_index_stats`) with `X-Pinecone-API-Version: 2025-04`. It does **not** forward index creation or the 2026-07 documents API (`/namespaces/.../documents/*`). Indexes made in the Pinecone console get a document schema, which rejects vector reads, so don't use them. `roost-nest` was created from the laptop via `POST https://api.pinecone.io/indexes` (API 2025-04) with the `.env` key. The old `roost` index is unused.

@@ -87,7 +87,8 @@ credential.
 - [x] On the Sprite: `sprite exec --no-stdin -- curl -s https://api.sprites.dev/v1/gateway/list` lists both
       with their `gateway_base_url` + `usage_snippet`
 - [x] Smoke-test one call per connector: Box `GET /2.0/folders/0/items` → 200; Pinecone `GET /indexes` → 200
-- [x] Create Pinecone index `roost` **in the Pinecone console** (the connector returns 403 "endpoint is
+- [x] ~~Create Pinecone index `roost` **in the Pinecone console**~~ — superseded in Phase 3: the console
+      makes a document-schema index, which the connector can't search. See Phase 3. (the connector returns 403 "endpoint is
       not supported" for index creation): serverless, aws `us-east-1`, integrated `llama-text-embed-v2`
       (1024, cosine) on field `chunk_text`
 - [x] Box download works through the gateway: `GET /2.0/files/<id>/content` → 200 with the bytes, no
@@ -98,11 +99,18 @@ credential.
 
 > Goal: `POST /ingest` loads my Box docs into Pinecone, incrementally.
 
-- [ ] List files via the Box connector; fetch text for supported types
-- [ ] Embed + upsert into Pinecone (use Pinecone's **hosted embeddings** so no separate embedder — keeps
-      it $0 and connector-only), one namespace for me
-- [ ] Track a cursor in `nest.json` (persistent fs) so re-ingest only touches new/changed files
-- [ ] Idempotent: running `/ingest` twice adds nothing the second time
+- [x] List files via the Box connector; fetch text for supported types (`.md`, `.markdown`, `.txt`)
+- [x] Embed + upsert into Pinecone (use Pinecone's **hosted embeddings** so no separate embedder — keeps
+      it $0 and connector-only), one namespace `me`
+- [x] Track a cursor in `nest.json` (persistent fs) so re-ingest only touches new/changed files
+- [x] Idempotent: running `/ingest` twice adds nothing the second time
+
+> **Nov 25 result:** first `/ingest` added 8 files / 47 chunks in 34 s; the second run changed nothing
+> (1.3 s). The connector forwards `/embed` and the vectors API but **not** the 2026-07 documents API, and
+> the console-made `roost` index has a document schema that rejects vector reads. So roost embeds via
+> `/embed` and stores plain vectors (chunk text in metadata) in **`roost-nest`**: a plain dense index
+> (1024, cosine, aws us-east-1) created from the laptop with the `.env` key. The old `roost` index is
+> unused and can be deleted in the console.
 
 ## Phase 4 — Ask / triage path (nest → typed decision)
 
