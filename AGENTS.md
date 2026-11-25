@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to coding agents working with code in this repository.
+This file provides guidance to coding agents (Claude Code and others) when working with code in this repository.
 
 ## Status
 
@@ -36,10 +36,13 @@ Single service, two endpoints:
 
 ```sh
 curl -fsSL https://sprites.dev/install.sh | sh && sprite login
-sprite create --label env=hacksgiving roost && sprite use roost
-sprite-env services create roost --cmd python3 --args /root/roost/service.py   # survives hibernation
-sprite config update --url-auth public                                         # public URL
-sprite exec -- curl -s https://api.sprites.dev/v1/gateway/list                 # verify connectors
+sprite create --skip-console --label env=hacksgiving roost && sprite use roost   # URL: https://roost-b6xbd.sprites.app
+sprite file push -p service.py /home/sprite/roost/service.py                      # deploy (Sprite user is `sprite`, not root)
+sprite exec --no-stdin -- sprite-env services create roost --cmd python3 \
+  --args /home/sprite/roost/service.py --dir /home/sprite/roost --http-port 8080
+sprite exec --no-stdin -- sprite-env services restart roost                       # after pushing new code
+sprite config update --url-auth public                                            # public URL
+sprite exec --no-stdin -- curl -s https://api.sprites.dev/v1/gateway/list        # verify connectors
 sprite checkpoint create --comment "MVP working"
 ```
 

@@ -35,6 +35,11 @@ credential.
 - **Runtime:** Ubuntu 25.10 Firecracker microVM, 100 GB persistent ext4, arbitrary code. Python/Node/Go
   etc. and coding-agent CLIs preinstalled. Hibernates when idle (scale-to-zero, unbilled);
   **filesystem persists, RAM does not**; warm wake ~100–500 ms, cold 1–2 s.
+- **Tested Nov 25 (contradicts the line above for roost):** a running service keeps the Sprite awake,
+  so it never scales to zero while `roost` runs. The documented "`--http-port` service auto-starts on
+  request" did not happen: after `services stop`, requests returned 502, then timed out, and the
+  service stayed `stopped`. `sprite info` showed `cold` while `/proc/uptime` was continuous, so that
+  status is not a reliable sign of hibernation.
 - **Connectors = keyless creds.** Credential lives in Fly's control plane; the Sprite never holds it.
   Call shape `https://api.sprites.dev/v1/gateway/<provider>/<conn_id>/<path>` with **no** auth header;
   the Sprite is identified by its Fly request signature. Discover ready connections at runtime with
@@ -61,19 +66,24 @@ credential.
 
 > Goal: An empty Sprite running a "hello" HTTP service I can hit from my phone.
 
-- [ ] Install CLI: `curl -fsSL https://sprites.dev/install.sh | sh` · `sprite login`
-- [ ] `sprite create --label env=hacksgiving roost` · `sprite use roost`
-- [ ] Minimal `service.py` (stdlib `http.server`) returning `ok`; run it as a hibernation-surviving
-      service: `sprite-env services create roost --cmd python3 --args /root/roost/service.py`
-- [ ] `sprite config update --url-auth public` → confirm the public URL responds
+- [x] Install CLI: `curl -fsSL https://sprites.dev/install.sh | sh` · `sprite login`
+- [x] `sprite create --skip-console --label env=hacksgiving roost` · `sprite use roost`
+      → `https://roost-b6xbd.sprites.app`
+- [x] Minimal `service.py` (stdlib `http.server`) returning `ok`; run it as a hibernation-surviving
+      service: `sprite-env services create roost --cmd python3 --args /home/sprite/roost/service.py
+      --dir /home/sprite/roost --http-port 8080` (Sprite user is `sprite`, not root)
+- [x] `sprite config update --url-auth public` → confirm the public URL responds
 - [ ] Prove persistence: write a file, force idle, wake, file still there
+      (blocked: couldn't force a real pause; see the Nov 25 test note above)
+- [x] **Decision (Nov 25):** leave the `roost` service always running, so the Sprite stays awake
+      through judging. Check the Fly dashboard usage page to confirm it fits the Free plan.
 
 ## Phase 2 — Grant & verify connectors
 
 > Goal: `GET /v1/gateway/list` on the Sprite shows Box and Pinecone ready.
 
 - [ ] Dashboard: Org → Connectors → grant **Box** and **Pinecone** to label `env=hacksgiving`
-- [ ] On the Sprite: `sprite exec -- curl -s https://api.sprites.dev/v1/gateway/list` lists both
+- [ ] On the Sprite: `sprite exec --no-stdin -- curl -s https://api.sprites.dev/v1/gateway/list` lists both
       with their `gateway_base_url` + `usage_snippet`
 - [ ] Smoke-test one call per connector (list Box files; Pinecone describe-index)
 - [ ] Pick the decision engine for Phase 4: rules template, or Gemini free-tier connector if it is
