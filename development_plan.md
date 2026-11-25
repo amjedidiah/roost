@@ -134,10 +134,10 @@ credential.
 
 > Goal: A submittable entry with a clean, honest story.
 
-- [ ] `README`: what it does, the two connectors, run steps, the "triggered not scheduled" caveat
-- [ ] 60–90 s screen demo: `/ingest` my Box docs → `/ask` → show the typed decision → re-ask to show
+- [x] `README`: what it does, the two connectors, run steps, the "triggered not scheduled" caveat
+- [ ] 60–90 s screen demo (Playwright recording with labels): `/ingest` my Box docs → `/ask` → show the typed decision → re-ask to show
       the nest remembers (video = "bonus points" per rules)
-- [ ] `sprite checkpoint create --comment "MVP working"` before recording
+- [x] `sprite checkpoint create --comment "MVP working"` before recording (checkpoint `v5`, Nov 25)
 - [ ] Post on X / Bluesky / LinkedIn / Reddit with the demo, **tag @flydotio**
 - [ ] Submit the form: code link + demo link + 1–2 sentence description
 - [ ] Keep Sprite + connectors live through Dec 1 (judging)

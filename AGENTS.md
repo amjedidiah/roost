@@ -12,6 +12,7 @@ This file provides guidance to coding agents (Claude Code and others) when worki
 python3 -m unittest discover -s tests -t .                       # all tests (local; fakes, no network)
 python3 -m unittest tests.test_ingest.IngestTest.test_second_run_is_a_no_op   # one test
 ./scripts/deploy.sh                                              # push *.py to the Sprite and restart the service
+./scripts/create-index.sh                                        # one-time: create the roost-nest index with the .env key
 ./scripts/set-token.sh                                           # create ROOST_TOKEN in .env (if missing), install its hash on the Sprite
 curl -X POST -H "X-Roost-Token: $ROOST_TOKEN" https://roost-b6xbd.sprites.app/ingest   # run ingest
 curl -G -H "X-Roost-Token: $ROOST_TOKEN" --data-urlencode "q=when does my car insurance renew" https://roost-b6xbd.sprites.app/ask
