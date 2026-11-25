@@ -8,10 +8,27 @@ Built for Hacksgiving 2026.
 
 > **Status:** work in progress. Run steps, endpoints and a demo are coming. See [`development_plan.md`](development_plan.md).
 
-## Endpoints (planned)
+## Endpoints
 
-- `POST /ingest` loads Box docs into the nest. It is incremental and idempotent.
-- `GET /ask?q=...` retrieves relevant context and returns a typed JSON decision.
+Both require an `X-Roost-Token` header.
+
+- `POST /ingest` loads `.md` and `.txt` files from the Box `roost/` folder into the nest. It is incremental: a second run with no changes in Box does nothing.
+- `GET /ask?q=...` finds the best-matching document and returns a typed JSON decision: which file, category, priority, next action, due date and the to-do item it came from.
+
+```json
+{
+  "answered": true,
+  "source_file": "car-insurance-renewal.md",
+  "category": "finance",
+  "priority": "medium",
+  "next_action": "follow_up",
+  "due": "2026-12-10",
+  "action_item": "Call Harbourline before 10 December to negotiate; otherwise switch to Bramble.",
+  "summary": "car-insurance-renewal.md answers this. Finance, medium priority: Call Harbourline before 10 December to negotiate; otherwise switch to Bramble. (due 10 Dec 2026)"
+}
+```
+
+The decision is made by fixed rules over your own documents, not by a language model.
 
 ## Note
 

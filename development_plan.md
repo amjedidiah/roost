@@ -116,12 +116,19 @@ credential.
 
 > Goal: `GET /ask?q=...` returns a **structured** answer over retrieved context.
 
-- [ ] Query Pinecone for top-k chunks relevant to `q`
-- [ ] Make the typed decision from `q` + context with a rules template and a fixed output
-      schema, e.g. `{ answered: bool, source_file: str, category: enum, priority: enum, next_action: enum }`
-- [ ] Return that JSON (+ a one-line template rendered from the typed fields — the engine decides,
+- [x] Query Pinecone for top-k chunks relevant to `q`
+- [x] Make the typed decision from `q` + context with a rules template and a fixed output
+      schema: `{ answered: bool, source_file: str, category: enum, priority: enum, next_action: enum,
+      due: date, action_item: str, confidence, evidence, matches, summary }`
+- [x] Return that JSON (+ a one-line template rendered from the typed fields — the engine decides,
       the template phrases)
-- [ ] Append each answer to `history/` in the nest
+- [x] Append each answer to `history/` in the nest (`data/history/YYYY-MM-DD.jsonl` on the Sprite)
+- [x] Shared secret: `/ingest` and `/ask` require `X-Roost-Token`; the Sprite stores only its SHA-256
+
+> **Nov 25 result:** answered threshold 0.28 (on-topic questions scored 0.36–0.50, off-topic ≤ 0.18).
+> Live answers on the sample docs: lease → high / act_now (notice due 2 Dec); car insurance →
+> medium / follow_up (call by 10 Dec); trip → high / act_now (buy insurance this week); recipe →
+> low / review; "who won the football match" → not answered.
 
 ## Phase 5 — Demo, post, submit (before 08:00 WAT Mon Nov 30)
 

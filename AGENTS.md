@@ -4,7 +4,7 @@ This file provides guidance to coding agents (Claude Code and others) when worki
 
 ## Status
 
-`development_plan.md` is the source of truth for scope, phases and checklist. Phases 0–3 are done; `/ask` (Phase 4) is next.
+`development_plan.md` is the source of truth for scope, phases and checklist. Phases 0–4 are done; Phase 5 (demo and submission) is next.
 
 ## Commands
 
@@ -14,6 +14,7 @@ python3 -m unittest tests.test_ingest.IngestTest.test_second_run_is_a_no_op   # 
 ./scripts/deploy.sh                                              # push *.py to the Sprite and restart the service
 ./scripts/set-token.sh                                           # create ROOST_TOKEN in .env (if missing), install its hash on the Sprite
 curl -X POST -H "X-Roost-Token: $ROOST_TOKEN" https://roost-b6xbd.sprites.app/ingest   # run ingest
+curl -G -H "X-Roost-Token: $ROOST_TOKEN" --data-urlencode "q=when does my car insurance renew" https://roost-b6xbd.sprites.app/ask
 ```
 
 **Auth:** `/ingest` (and `/ask`) require the `X-Roost-Token` header. The token lives only in the local `.env`; the Sprite keeps just its SHA-256 in `data/token.sha256` and fails closed (503) without it. `/` and `/healthz` are open.
@@ -30,12 +31,12 @@ Deadline: midnight PST Sun Nov 29 2026 (08:00 WAT Mon Nov 30). Sprite + connecto
 
 Single service, two endpoints:
 
-Modules: `auth.py` (shared-secret check), `gateway.py` (connection discovery + keyless HTTP), `box.py`, `nest.py` (Pinecone), `ingest.py` (chunking + sync logic), `service.py` (HTTP).
+Modules: `auth.py` (shared-secret check), `gateway.py` (connection discovery + keyless HTTP), `box.py`, `nest.py` (Pinecone), `ingest.py` (chunking + sync logic), `decide.py` (rules engine, pure), `ask.py` (search + decide + history), `service.py` (HTTP).
 
 - `POST /ingest` — lists Box folder `roost/`, downloads `.md`/`.markdown`/`.txt` files, splits them into heading-prefixed chunks (≤1200 chars), embeds them through the connector's `/embed` (`llama-text-embed-v2`, 1024 dims), and upserts plain vectors to Pinecone index **`roost-nest`**, namespace `me`. Vector ids are `<box_file_id>#<chunk_index>`; metadata holds `file_id`, `file_name`, `chunk_index`, `chunk_text`, `modified_at`. `data/nest.json` (on the Sprite, gitignored) records each file's Box `sha1`, name and chunk count: unchanged files are skipped, changed files are re-embedded and their surplus chunk ids deleted, and files gone from Box have all their chunks deleted. A lock returns 409 if an ingest is already running.
-- `GET /ask?q=...` — Pinecone top-k query → typed decision from `q` + context with a fixed output schema, e.g. `{ answered: bool, source_file: str, category: enum, priority: enum, next_action: enum }` → return the JSON plus a one-line template rendered from the typed fields. The engine *decides*; a template phrases it — no free-form prose generation. Each answer is appended under `history/`.
+- `GET /ask?q=...` — embeds `q` (`input_type: query`), queries top 8, and if the best score is ≥ `ROOST_ANSWER_THRESHOLD` (0.28) fetches every chunk of that file (count from `nest.json`) so dates and to-dos outside the matched chunks count. `decide.py` then fills the schema; the result is appended to `data/history/YYYY-MM-DD.jsonl`.
 
-**Decision engine:** a rules template, no model. It fills the schema from the retrieved matches (scores, metadata, keywords).
+**Decision engine (`decide.py`):** fixed rules, no model; `decide()` is pure and takes `today`. `answered` = score threshold. `category` = keyword counts over file name + text (enum in `CATEGORIES`). `action_item` = the bullet under a To do / Next steps / Follow-ups heading with the most question-word overlap; ties go to the most urgent (own date, or "this week"/"asap" ≈ 7 days), then bolded. `due` = the action item's own date only (another date in the file would mislabel it), or the file's next date when there is no action item. `priority` = ≤7 days high, ≤30 medium, else low; undated urgent wording → high. `next_action` = none / review / act_now (high) / follow_up (chase, call, confirm…) / schedule. Date parsing only matches within one line (`[ \t]`, not `\s`) so a heading date can't join a numbered list item. `summary` is a template over these fields.
 
 ## Hard constraints
 

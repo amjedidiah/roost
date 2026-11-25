@@ -7,6 +7,7 @@ index must be a plain dense index (1024 dims, cosine) without a document schema.
 """
 
 import os
+import urllib.parse
 
 import gateway
 
@@ -17,6 +18,7 @@ NAMESPACE = os.environ.get("ROOST_NAMESPACE", "me")
 EMBED_BATCH = 96  # max inputs per /embed request for this model
 UPSERT_BATCH = 100
 DELETE_BATCH = 1000
+FETCH_BATCH = 100
 
 
 class Nest:
@@ -50,6 +52,19 @@ class Nest:
         for i in range(0, len(ids), DELETE_BATCH):
             self._post(f"/indexes/{INDEX}/vectors/delete",
                        {"ids": ids[i:i + DELETE_BATCH], "namespace": NAMESPACE})
+
+    def fetch(self, ids):
+        """Fetch vectors by id. Returns {id: {"id", "values", "metadata"}}; missing ids are absent."""
+        found = {}
+        for i in range(0, len(ids), FETCH_BATCH):
+            params = urllib.parse.urlencode({"ids": ids[i:i + FETCH_BATCH], "namespace": NAMESPACE}, doseq=True)
+            resp = gateway.request(
+                "GET",
+                f"{gateway.base_url('pinecone')}/indexes/{INDEX}/vectors/fetch?{params}",
+                headers={"X-Pinecone-API-Version": API_VERSION},
+            )
+            found.update(resp.get("vectors", {}))
+        return found
 
     def query(self, vector, top_k=5):
         resp = self._post(f"/indexes/{INDEX}/query", {

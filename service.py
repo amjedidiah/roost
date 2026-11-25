@@ -6,15 +6,18 @@ import signal
 import sys
 import threading
 import traceback
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import auth
 import gateway
+from ask import ask
 from box import Box
 from ingest import ingest
 from nest import Nest
 
 PORT = int(os.environ.get("PORT", "8080"))
+MAX_QUESTION = 500
 
 _ingest_lock = threading.Lock()
 
@@ -32,11 +35,23 @@ class Handler(BaseHTTPRequestHandler):
         self._send(status, json.dumps(obj, indent=2) + "\n", "application/json")
 
     def do_GET(self):
-        path = self.path.split("?", 1)[0]
+        path, _, query = self.path.partition("?")
         if path in ("/", "/healthz"):
             self._send(200, "ok\n")
+        elif path == "/ask":
+            if self._authorized():
+                self._ask(urllib.parse.parse_qs(query).get("q", [""])[0].strip())
         else:
             self._json(404, {"error": "not found", "path": path})
+
+    def _ask(self, question):
+        if not question:
+            self._json(400, {"error": "missing question: use /ask?q=..."})
+            return
+        if len(question) > MAX_QUESTION:
+            self._json(400, {"error": f"question longer than {MAX_QUESTION} characters"})
+            return
+        self._guarded(lambda: ask(question, Nest()))
 
     def _authorized(self):
         failure = auth.check(self.headers.get(auth.HEADER))
@@ -58,7 +73,14 @@ class Handler(BaseHTTPRequestHandler):
             self._json(409, {"error": "an ingest is already running"})
             return
         try:
-            self._json(200, ingest(Box(), Nest()))
+            self._guarded(lambda: ingest(Box(), Nest()))
+        finally:
+            _ingest_lock.release()
+
+    def _guarded(self, work):
+        """Run work() and reply with its JSON, mapping failures to HTTP errors."""
+        try:
+            self._json(200, work())
         except gateway.GatewayError as e:
             self._json(502, {"error": str(e), "upstream_status": e.status, "detail": e.body})
         except LookupError as e:
@@ -66,8 +88,6 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # keep the service up; log the trace for `services` logs
             traceback.print_exc()
             self._json(500, {"error": f"{type(e).__name__}: {e}"})
-        finally:
-            _ingest_lock.release()
 
 
 def main():
