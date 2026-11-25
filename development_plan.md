@@ -14,8 +14,8 @@ credential.
 
 **Deadline:** midnight PST Sun Nov 29 = **08:00 WAT Mon Nov 30**. Winners emailed Dec 1.
 
-> **Nov 25:** TypeSafe AI (Jev) dropped from scope. The decision step uses what was the fallback:
-> a rules template or a free-tier model connector (Gemini), same schema. Decide at Phase 2.
+> **Nov 25:** TypeSafe AI (Jev) dropped from scope. Gemini also ruled out (free tier not guaranteed,
+> and free-tier prompts may be used by Google). The typed decision is made by a **rules template**.
 
 ---
 
@@ -82,12 +82,17 @@ credential.
 
 > Goal: `GET /v1/gateway/list` on the Sprite shows Box and Pinecone ready.
 
-- [ ] Dashboard: Org → Connectors → grant **Box** and **Pinecone** to label `env=hacksgiving`
-- [ ] On the Sprite: `sprite exec --no-stdin -- curl -s https://api.sprites.dev/v1/gateway/list` lists both
+- [x] Dashboard: Org → Connectors → grant **Box** and **Pinecone** to label `env=hacksgiving`
+      (Sprite Labels field takes the label exactly as stored: `env=hacksgiving`)
+- [x] On the Sprite: `sprite exec --no-stdin -- curl -s https://api.sprites.dev/v1/gateway/list` lists both
       with their `gateway_base_url` + `usage_snippet`
-- [ ] Smoke-test one call per connector (list Box files; Pinecone describe-index)
-- [ ] Pick the decision engine for Phase 4: rules template, or Gemini free-tier connector if it is
-      available and $0
+- [x] Smoke-test one call per connector: Box `GET /2.0/folders/0/items` → 200; Pinecone `GET /indexes` → 200
+- [x] Create Pinecone index `roost` **in the Pinecone console** (the connector returns 403 "endpoint is
+      not supported" for index creation): serverless, aws `us-east-1`, integrated `llama-text-embed-v2`
+      (1024, cosine) on field `chunk_text`
+- [x] Box download works through the gateway: `GET /2.0/files/<id>/content` → 200 with the bytes, no
+      redirect handling needed. Source docs live in Box folder `roost/`
+- [x] Decision engine for Phase 4: **rules template** (no Gemini, no model connector)
 
 ## Phase 3 — Ingest path (Box → nest)
 
@@ -104,7 +109,7 @@ credential.
 > Goal: `GET /ask?q=...` returns a **structured** answer over retrieved context.
 
 - [ ] Query Pinecone for top-k chunks relevant to `q`
-- [ ] Make the typed decision from `q` + context (engine chosen in Phase 2) with a fixed output
+- [ ] Make the typed decision from `q` + context with a rules template and a fixed output
       schema, e.g. `{ answered: bool, source_file: str, category: enum, priority: enum, next_action: enum }`
 - [ ] Return that JSON (+ a one-line template rendered from the typed fields — the engine decides,
       the template phrases)
@@ -132,16 +137,16 @@ credential.
 | Service | Python stdlib (`http.server`) | Preinstalled, zero deps, deploys in minutes | $0 |
 | Source | **Box** connector | Personal docs, legible demo, judge connector | $0 (free personal) |
 | Memory | **Pinecone** connector (+ hosted embeddings) | Vector nest = persistent semantic recall | $0 (Starter) |
-| Decision | Rules template or Gemini free-tier connector | Typed, schema'd triage over context (not prose) | $0 |
+| Decision | Rules template | Typed, schema'd triage over context (not prose) | $0 |
 | Creds | Sprites connector gateway | Sprite never holds a key | $0 |
 
 **Non-goals:** no auth UI, no multi-user, no framework, no DB beyond Pinecone,
-no TypeSafe AI.
+no TypeSafe AI, no Gemini or other model connector.
 
 ## Risks / honesty
 
-- **$0 hinges on free tiers** — Fly Free, Box personal, Pinecone Starter are confirmed free. If Gemini
-  isn't $0 via a connector, the rules template keeps the decision step free.
+- **$0 hinges on free tiers** — Fly Free, Box personal, Pinecone Starter are confirmed free. The
+  decision step is a rules template, so it adds no cost.
 - **"Built this week":** clean Nov 23–29 commit history; all code written this week.
 - **Triggered, not scheduled:** MVP runs on demand (no native Sprite cron); README says so and points at
   the webhook/phone-cron path as the productionization step.

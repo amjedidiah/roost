@@ -8,7 +8,7 @@ Greenfield. The repo currently contains only `development_plan.md` (the source o
 
 ## What roost is
 
-Hacksgiving 2026 (Fly.io) entry: a personal **archivist agent** running as a Python HTTP service on a Fly.io **Sprite** (persistent Firecracker microVM). It ingests the user's own Box documents into Pinecone vector memory (the "nest"), and answers questions by retrieving context and returning a **typed, schema'd decision**. TypeSafe AI (Jev) was dropped from scope on Nov 25 2026; don't reintroduce it.
+Hacksgiving 2026 (Fly.io) entry: a personal **archivist agent** running as a Python HTTP service on a Fly.io **Sprite** (persistent Firecracker microVM). It ingests the user's own Box documents into Pinecone vector memory (the "nest"), and answers questions by retrieving context and returning a **typed, schema'd decision**. TypeSafe AI (Jev) and Gemini were both dropped from scope on Nov 25 2026; don't reintroduce them or add another model connector.
 
 Deadline: midnight PST Sun Nov 29 2026 (08:00 WAT Mon Nov 30). Sprite + connectors must stay live through Dec 1 (judging).
 
@@ -16,10 +16,10 @@ Deadline: midnight PST Sun Nov 29 2026 (08:00 WAT Mon Nov 30). Sprite + connecto
 
 Single service, two endpoints:
 
-- `POST /ingest` — Box connector → list files, fetch text for supported types → upsert into Pinecone using **Pinecone hosted embeddings** (no separate embedder), one namespace. A cursor in `nest.json` on the persistent filesystem makes re-ingest incremental; running it twice must add nothing the second time.
+- `POST /ingest` — Box connector → list files, fetch text for supported types → upsert into Pinecone index `roost` using **Pinecone hosted embeddings** (`llama-text-embed-v2`, text in field `chunk_text`), one namespace. Source docs are in Box folder `roost/`; skip types stdlib can't read. A cursor in `nest.json` on the persistent filesystem makes re-ingest incremental; running it twice must add nothing the second time.
 - `GET /ask?q=...` — Pinecone top-k query → typed decision from `q` + context with a fixed output schema, e.g. `{ answered: bool, source_file: str, category: enum, priority: enum, next_action: enum }` → return the JSON plus a one-line template rendered from the typed fields. The engine *decides*; a template phrases it — no free-form prose generation. Each answer is appended under `history/`.
 
-**Decision engine:** a rules template or a free-tier model connector (Gemini), chosen at Phase 2. Either way the schema and endpoint stay the same.
+**Decision engine:** a rules template, no model. It fills the schema from the retrieved matches (scores, metadata, keywords).
 
 ## Hard constraints
 
@@ -46,4 +46,4 @@ sprite exec --no-stdin -- curl -s https://api.sprites.dev/v1/gateway/list       
 sprite checkpoint create --comment "MVP working"
 ```
 
-Connectors (Box, Pinecone) are granted in the Fly dashboard to the label `env=hacksgiving`; they are default-deny.
+Connectors (Box, Pinecone) are granted in the Fly dashboard to the label `env=hacksgiving`; they are default-deny. The Pinecone connector can't create indexes (403); do that in the Pinecone console.
