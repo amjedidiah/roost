@@ -15,8 +15,8 @@ import gateway
 from store import read_json, write_json
 
 INBOX = os.environ.get("ROOST_INBOX", "roost-nest@agentmail.to")
-DAILY_BUDGET = int(os.environ.get("ROOST_MAIL_BUDGET", "90"))
-TEST_BUDGET = int(os.environ.get("ROOST_TEST_MAIL_BUDGET", "8"))
+DAILY_BUDGET = int(os.environ.get("ROOST_MAIL_BUDGET", "88"))
+TEST_BUDGET = int(os.environ.get("ROOST_TEST_MAIL_BUDGET", "10"))
 BUDGETS = {"user": DAILY_BUDGET, "test": TEST_BUDGET}
 
 _lock = threading.Lock()

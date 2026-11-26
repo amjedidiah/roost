@@ -1,10 +1,10 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-25T21:05:45+00:00",
+  "generatedAt": "2026-11-26T08:41:11+00:00",
   "title": "Design System: roost",
   "extensions": {
     "colorMeta": {
-      "highlighter": {
+      "signal": {
         "role": "primary",
         "displayName": "Highlighter Yellow",
         "canonical": "#ffd60a",
@@ -19,102 +19,130 @@
           "#fff3b0"
         ]
       },
-      "ink": {
+      "night": {
         "role": "neutral",
-        "displayName": "Press Ink",
-        "canonical": "#121212",
+        "displayName": "Night",
+        "canonical": "#111111",
         "tonalRamp": [
-          "#121212",
+          "#111111",
+          "#1b1b1b",
           "#262626",
-          "#3b3b3b",
-          "#525252",
-          "#6b6b6b",
-          "#8c8c8c",
-          "#b3b3b3",
-          "#d6d6d6"
+          "#333333",
+          "#5c5c5c",
+          "#a6a6a6",
+          "#d6d6d4",
+          "#f4f4f2"
         ]
       },
-      "graphite": {
+      "card": {
         "role": "neutral",
-        "displayName": "Graphite",
-        "canonical": "#6b6b6b"
+        "displayName": "Card",
+        "canonical": "#1b1b1b"
       },
-      "hairline": {
+      "raised": {
         "role": "neutral",
-        "displayName": "Hairline Grey",
-        "canonical": "#d6d6d6"
+        "displayName": "Raised",
+        "canonical": "#262626"
       },
-      "wash": {
+      "line": {
         "role": "neutral",
-        "displayName": "Wash",
-        "canonical": "#f3f3f3"
+        "displayName": "Line",
+        "canonical": "#333333"
       },
-      "paper": {
+      "text": {
         "role": "neutral",
-        "displayName": "Sheet White",
+        "displayName": "Text",
+        "canonical": "#f4f4f2"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#a6a6a6"
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Danger",
+        "canonical": "#ff8a7a"
+      },
+      "bright": {
+        "role": "neutral",
+        "displayName": "Bright",
         "canonical": "#ffffff"
       }
     },
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "The single page heading."
+        "purpose": "The signed-out headline."
       },
-      "headline": {
-        "displayName": "Headline",
-        "purpose": "The decision sheet head."
+      "section": {
+        "displayName": "Section",
+        "purpose": "Section headings and the date number."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "The highlighted action line."
+        "purpose": "Sign-in card and empty-state headings."
       },
-      "value": {
-        "displayName": "Value",
-        "purpose": "Field values and the question field."
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "Line under the headline; the question text."
+      },
+      "item": {
+        "displayName": "Item",
+        "purpose": "The line of a due item."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Lede, passages, sample questions."
+        "purpose": "Running text and buttons."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Notes under forms; evidence quotes."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Field labels, captions, metadata, in graphite."
+        "purpose": "Tags, usage, captions, footer, link buttons."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Month and weekday in the date block (uppercase)."
       },
       "mono": {
         "displayName": "Mono",
-        "purpose": "Token field and raw JSON only."
+        "purpose": "The 6-digit code field only."
       }
     },
     "shadows": [],
     "motion": [
       {
-        "name": "ease-set",
-        "value": "cubic-bezier(.16, 1, .3, 1)",
-        "purpose": "Every transition and the sheet's set sequence."
+        "name": "ease",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "Every transition."
       },
       {
-        "name": "set",
-        "value": "clip-path inset(0 100% 0 0) -> inset(0); 500ms; 70ms stagger",
-        "purpose": "Sheet parts set left to right in order when an answer arrives."
+        "name": "rise",
+        "value": "translateY(10px) + opacity 0 -> none; 500ms",
+        "purpose": "New answers and due items arrive."
       },
       {
         "name": "sweep",
-        "value": "background-size 0% -> 100%; 650ms; after the last row",
-        "purpose": "Highlighter sweeps the action line."
+        "value": "background-size 0% -> 100%; 700ms; 300ms delay",
+        "purpose": "The yellow highlight sweeps in once."
+      },
+      {
+        "name": "usage",
+        "value": "transform: scaleX(); 400ms",
+        "purpose": "The usage bar grows."
       }
     ],
     "breakpoints": [
       {
         "name": "phone",
-        "value": "max-width: 559px"
+        "value": "max-width: 480px"
       },
       {
-        "name": "tablet",
-        "value": "min-width: 720px"
-      },
-      {
-        "name": "desktop",
-        "value": "min-width: 1040px"
+        "name": "wide",
+        "value": "min-width: 640px"
       }
     ]
   },
@@ -123,109 +151,79 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Solid ink block for Ask and Save; inverts on hover.",
-      "html": "<button class=\"ds-btn\">Ask</button>",
-      "css": ".ds-btn{min-height:48px;padding:0 24px;border:1px solid #121212;border-radius:0;background:#121212;color:#fff;font:700 16px/1 'Schibsted Grotesk',Helvetica,Arial,sans-serif;transition:background-color .2s cubic-bezier(.16,1,.3,1),color .2s cubic-bezier(.16,1,.3,1);cursor:pointer}.ds-btn:hover{background:#fff;color:#121212}.ds-btn:focus-visible{outline:2px solid #121212;outline-offset:3px}"
+      "description": "Off-white fill with night text; brightens on hover.",
+      "html": "<button class=\"ds-btn\">Add a document</button>",
+      "css": ".ds-btn{min-height:52px;padding:0 24px;border:0;border-radius:10px;background:#f4f4f2;color:#111;font:700 16px/1 'Schibsted Grotesk',Helvetica,Arial,sans-serif;transition:background-color .2s cubic-bezier(.16,1,.3,1),transform .2s cubic-bezier(.16,1,.3,1);cursor:pointer}.ds-btn:hover{background:#fff}.ds-btn:active{transform:scale(.98)}.ds-btn:focus-visible{outline:2px solid #f4f4f2;outline-offset:3px}"
     },
     {
-      "name": "Question Field",
-      "kind": "input",
-      "refersTo": "input-question",
-      "description": "Boxless textarea on a 2px ink underline that thickens on focus.",
-      "html": "<textarea class=\"ds-q\" rows=\"1\" placeholder=\"Ask a question\"></textarea>",
-      "css": ".ds-q{width:100%;padding:8px 0 12px;border:0;border-bottom:2px solid #121212;border-radius:0;background:transparent;font:400 20px/1.25 'Schibsted Grotesk',Helvetica,Arial,sans-serif;letter-spacing:-.01em;resize:none;color:#121212}.ds-q::placeholder{color:#6b6b6b}.ds-q:focus-visible{outline:none;border-bottom-width:4px;padding-bottom:10px}"
-    },
-    {
-      "name": "Text Button",
+      "name": "Pill",
       "kind": "button",
-      "refersTo": "button-text",
-      "description": "Underlined 14px ink text for Re-ingest and Change, padded to a 44px tap area.",
-      "html": "<button class=\"ds-link\">Re-ingest</button>",
-      "css": ".ds-link{background:none;border:0;padding:12px 0;margin:-12px 0;color:#121212;font:400 14px/1.45 'Schibsted Grotesk',Helvetica,Arial,sans-serif;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;cursor:pointer}.ds-link:hover{text-decoration-thickness:2px}.ds-link:focus-visible{outline:2px solid #121212;outline-offset:3px}"
+      "refersTo": "pill",
+      "description": "Secondary action with a 1px line border, 44px tall.",
+      "html": "<button class=\"ds-pill\">Check for changes</button>",
+      "css": ".ds-pill{min-height:44px;padding:0 16px;border:1px solid #333;border-radius:999px;background:transparent;color:#f4f4f2;font:400 15px/1 'Schibsted Grotesk',Helvetica,Arial,sans-serif;cursor:pointer}.ds-pill:hover{background:#1b1b1b;border-color:#a6a6a6}"
     },
     {
-      "name": "Sheet Row",
-      "kind": "custom",
-      "refersTo": "sheet-row",
-      "description": "Numbered field: grey label, large value, optional right aside, hairline above.",
-      "html": "<div class=\"ds-row\"><span class=\"ds-l\">5&nbsp;&nbsp;Due</span><span class=\"ds-v\">10 Dec 2026</span><span class=\"ds-a\">in 15 days</span></div>",
-      "css": ".ds-row{display:grid;grid-template-columns:9em 1fr auto;align-items:baseline;gap:16px;padding:12px 0;border-top:1px solid #d6d6d6;font-family:'Schibsted Grotesk',Helvetica,Arial,sans-serif}.ds-l{font-size:14px;color:#6b6b6b}.ds-v{font-size:21px;line-height:1.3;color:#121212;font-variant-numeric:tabular-nums}.ds-a{font-size:14px;color:#6b6b6b}"
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Night inside a 1px line border; the border lights on focus.",
+      "html": "<input class=\"ds-field\" placeholder=\"you@example.com\">",
+      "css": ".ds-field{width:100%;height:52px;padding:0 16px;border:1px solid #333;border-radius:10px;background:#111;color:#f4f4f2;font:400 17px/1 'Schibsted Grotesk',Helvetica,Arial,sans-serif}.ds-field::placeholder{color:#a6a6a6}.ds-field:focus-visible{outline:none;border-color:#f4f4f2}"
     },
     {
-      "name": "Action Line",
-      "kind": "custom",
-      "refersTo": "action-line",
-      "description": "The one highlighted line: the to-do quoted from the source file, with its origin caption.",
-      "html": "<div class=\"ds-act\"><mark>Call Harbourline before 10 December to negotiate.</mark><span>Quoted from the “To do” list in car-insurance-renewal.md</span></div>",
-      "css": ".ds-act{font-family:'Schibsted Grotesk',Helvetica,Arial,sans-serif;padding:12px 0 16px;border-bottom:1px solid #121212}.ds-act mark{color:#121212;font-size:24px;font-weight:700;line-height:1.3;letter-spacing:-.01em;background:linear-gradient(#ffd60a,#ffd60a) no-repeat 0 70%/100% 78%;-webkit-box-decoration-break:clone;box-decoration-break:clone;padding:0 .12em;margin:0 -.12em}.ds-act span{display:block;margin-top:8px;font-size:14px;color:#6b6b6b}"
+      "name": "Due Item",
+      "kind": "card",
+      "refersTo": "due-item",
+      "description": "Date block, the exact line from the document, and tags naming when, how urgent, what to do and which file.",
+      "html": "<div class=\"ds-item\"><div class=\"ds-date\"><span>Dec</span><b>2</b><span>Wed</span></div><div><p class=\"ds-what\"><mark>Chase Calder for the written renewal offer before the 2 December notice deadline.</mark></p><div class=\"ds-tags\">Due in 6 days \u00b7 Urgent \u00b7 Chase it up \u00b7 from apartment-lease-2026.md</div></div></div>",
+      "css": ".ds-item{display:grid;grid-template-columns:64px minmax(0,1fr);gap:16px;padding:16px;border-radius:14px;background:#1b1b1b;color:#f4f4f2;font-family:'Schibsted Grotesk',Helvetica,Arial,sans-serif}.ds-date{display:grid;justify-items:center;padding:8px 0;border-radius:10px;background:#262626;line-height:1.1}.ds-date b{font-size:24px}.ds-date span{font-size:12px;color:#a6a6a6;text-transform:uppercase;letter-spacing:.06em}.ds-what{margin:0;font-size:17px;font-weight:700;line-height:1.35}.ds-what mark{color:#111;background:#ffd60a;padding:.03em .18em;border-radius:4px;box-decoration-break:clone;-webkit-box-decoration-break:clone}.ds-tags{margin-top:8px;font-size:14px;color:#a6a6a6}"
     },
     {
-      "name": "Priority Mark",
-      "kind": "custom",
-      "refersTo": "priority-mark",
-      "description": "Priority by square form: filled high, half medium, open low.",
-      "html": "<span class=\"ds-prio\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\"><rect x=\".75\" y=\".75\" width=\"10.5\" height=\"10.5\" fill=\"none\" stroke=\"#121212\" stroke-width=\"1.5\"/><rect x=\"0\" y=\"6\" width=\"12\" height=\"6\" fill=\"#121212\"/></svg>Medium</span>",
-      "css": ".ds-prio{display:inline-flex;align-items:center;gap:8px;font:400 21px/1.3 'Schibsted Grotesk',Helvetica,Arial,sans-serif;color:#121212}"
-    },
-    {
-      "name": "Sample Question",
-      "kind": "custom",
-      "refersTo": "sample-row",
-      "description": "Full-width ruled row with an ink arrow that nudges right on hover.",
-      "html": "<button class=\"ds-sample\"><span>When does my car insurance renew?</span><svg width=\"18\" height=\"12\" viewBox=\"0 0 18 12\"><path d=\"M0 6h16M11 1l5 5-5 5\" fill=\"none\" stroke=\"#121212\" stroke-width=\"1.5\"/></svg></button>",
-      "css": ".ds-sample{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:48px;padding:12px 0;border:0;border-top:1px solid #d6d6d6;background:none;text-align:left;font:400 16px/1.3 'Schibsted Grotesk',Helvetica,Arial,sans-serif;color:#121212;cursor:pointer}.ds-sample svg{transition:transform .3s cubic-bezier(.16,1,.3,1)}.ds-sample:hover span{text-decoration:underline;text-underline-offset:3px}.ds-sample:hover svg{transform:translateX(4px)}.ds-sample:focus-visible{outline:2px solid #121212;outline-offset:3px}"
+      "name": "Switch",
+      "kind": "input",
+      "refersTo": "switch",
+      "description": "On/off for reminders: a button with role=switch and a 44px hit area.",
+      "html": "<button class=\"ds-switch\" role=\"switch\" aria-checked=\"true\" aria-label=\"Email reminders\"></button>",
+      "css": ".ds-switch{position:relative;width:52px;height:32px;padding:0;border:0;border-radius:999px;background:#262626;cursor:pointer}.ds-switch::after{content:'';position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:#a6a6a6;transition:transform .25s cubic-bezier(.16,1,.3,1)}.ds-switch[aria-checked=true]{background:#f4f4f2}.ds-switch[aria-checked=true]::after{transform:translateX(20px);background:#111}"
     }
   ],
   "narrative": {
-    "northStar": "The Data Sheet",
-    "overview": "Every answer roost gives is set as a numbered data sheet in the International Typographic Style: typed fields on a strict grid, ruled in ink, with the one line that matters marked as if by highlighter. The page refuses the chat thread and the rounded-card dashboard. The system is quiet by default and dense where it counts: white paper, black ink, one grey for everything secondary, and a single signal colour on exactly one line per answer.",
+    "northStar": "The Night Shelf",
+    "overview": "A quiet shelf of your own papers, read at night: one dark column, white type, and a single yellow mark on the next thing you must do. Plain words on every control so anyone can use it on a phone. It refuses the chat thread, the busy dashboard and the cute bird theme.",
     "keyCharacteristics": [
-      "White sheet, black ink, square corners everywhere.",
+      "Near-black ground, off-white text, one grey for everything secondary.",
       "One self-hosted grotesk (Schibsted Grotesk) in two weights.",
-      "Numbered field rows separated by hairlines and closed by ink rules.",
-      "Highlighter yellow behind the action line, and nowhere else.",
-      "Priority shown by the form of a square mark, not by colour."
+      "Soft-cornered cards on the ground; no shadows.",
+      "Highlighter yellow on the next upcoming line only.",
+      "Urgency shown by a square mark plus a word, never colour alone."
     ],
     "rules": [
       {
         "name": "The One Line Rule",
-        "body": "Highlighter yellow marks exactly one line per answer: the action quoted from the source file.",
+        "body": "Yellow marks only the next thing to do: the first upcoming item, or the to-do in an answer.",
         "section": "colors"
       },
       {
-        "name": "The Ink Hierarchy Rule",
-        "body": "Hairline grey separates rows inside a group; ink closes a group. Never ink between ordinary rows.",
+        "name": "The Words First Rule",
+        "body": "Colour never carries meaning alone: lateness, urgency and errors are always words too.",
         "section": "colors"
       },
       {
-        "name": "The Dates-Only Tabular Rule",
-        "body": "Tabular figures apply to dates only; in Schibsted Grotesk tnum also widens . and , so scores stay proportional.",
+        "name": "No Tabular Figures",
+        "body": "Schibsted's tnum widens . and , so figures stay proportional.",
         "section": "typography"
       },
       {
         "name": "The Two Weights Rule",
-        "body": "Only 400 and 700. Emphasis is weight or size, never italics, colour or tracking.",
+        "body": "Only 400 and 700; emphasis is weight or size.",
         "section": "typography"
       },
       {
-        "name": "The Paper Rule",
-        "body": "Nothing floats. If an element needs separating, give it a rule or space, never a shadow or a card.",
+        "name": "The Three Grounds Rule",
+        "body": "Night is the page, card is a thing, raised is a part of a thing. Never a card on a card.",
         "section": "elevation"
       }
-    ],
-    "dos": [
-      "Do keep yellow behind the action line only (The One Line Rule).",
-      "Do show priority by mark form plus the word, never by colour alone.",
-      "Do say where every value came from: the file name on the sheet, and a caption naming the list the action was quoted from.",
-      "Do render all document text with textContent; it is user content.",
-      "Do keep every corner square and every rule 1px (2px for a head, 4px for focus on the question field)."
-    ],
-    "donts": [
-      "Don't add rounded cards, shadows, gradients or coloured badges; the sheet is flat paper.",
-      "Don't make it a chat: no bubbles, avatars or streamed prose.",
-      "Don't draw birds, nests or twigs; the roost idea lives in the name and the copy.",
-      "Don't number lists whose order means nothing (the sample questions stay unnumbered); the sheet's field numbers stay.",
-      "Don't turn on tabular figures for scores or prose in Schibsted Grotesk (The Dates-Only Tabular Rule)."
     ]
   }
 }

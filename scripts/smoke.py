@@ -2,8 +2,9 @@
 
 Signs in as the roost inbox (roost-nest@agentmail.to) so the code email can be read
 back through the AgentMail connector, then checks samples, due, upload, ask, a test
-reminder, delete and sign-out, and finally deletes its own account, so no user slot,
-Box content, vectors or session is left behind. It sends 2 emails.
+reminder, a forwarded email, delete and sign-out, and finally deletes its own
+account, so no user slot, Box content, vectors or session is left behind. It
+sends 3 emails, all from the test budget.
 
 The owner token arrives on stdin (never stored on the Sprite) and goes with the
 sign-in request, which marks it as a test: it skips the sign-in rate limits and
@@ -14,6 +15,7 @@ It runs once per deployed code version (a hash of the code on the Sprite); pass
 --force to run again. Run it with ./scripts/smoke.sh from the laptop.
 """
 
+import datetime as dt
 import hashlib
 import http.cookiejar
 import json
@@ -31,7 +33,7 @@ sys.path.insert(0, str(ROOT))
 import gateway  # noqa: E402
 from ingest import data_dir  # noqa: E402
 from digest import PUBLIC_URL  # noqa: E402
-from mail import INBOX  # noqa: E402
+from mail import INBOX, send  # noqa: E402
 from store import read_json, write_json  # noqa: E402
 
 BASE = PUBLIC_URL.rstrip("/")  # https, so the Secure session cookie comes back
@@ -120,6 +122,22 @@ class Smoke:
         self.check("upload", "smoke-bills.md" in names, (status, body))
         status, body = call("GET", "/api/ask?q=" + urllib.parse.quote("when do I pay the electricity bill"))
         self.check("ask finds the upload", status == 200 and body.get("source_file") == "smoke-bills.md", (status, body))
+        due_day = dt.date.today() + dt.timedelta(days=10)
+        bill = f"Water bill {time.strftime('%H%M%S')}"  # unique per run
+        send(INBOX, f"roost-smoke: Fwd: {bill}",
+             f"---------- Forwarded message ---------\nAmount due: 41.00\n"
+             f"Please pay by {due_day.day} {due_day:%B %Y} to avoid a late fee.\n", kind="test")
+        forwarded = []
+        for _ in range(15):
+            status, body = call("POST", "/api/sync")
+            forwarded += (body.get("forwarded") or {}).get("added", []) if status == 200 else []
+            if f"{bill}.txt" in forwarded:
+                break
+            time.sleep(4)
+        self.check("forwarded email becomes a document", f"{bill}.txt" in forwarded, (status, body))
+        due = call("GET", "/api/due?days=60")[1].get("items", [])
+        self.check("forwarded bill is in Coming up",
+                   any(i["file"] == f"{bill}.txt" and i["due"] == due_day.isoformat() for i in due), due[:3])
         t1 = stamp()
         status, body = call("POST", "/api/digest/test")
         self.check("test reminder sent", status == 200 and body.get("result") == "sent", (status, body))

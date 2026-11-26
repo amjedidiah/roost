@@ -24,6 +24,19 @@ def _clean(line):
     return re.sub(r"\s+", " ", _plain(line)).strip(" ·*_")
 
 
+def _continues(prev, line):
+    """Whether `line` carries on the sentence `prev` was wrapped in.
+
+    It does when `prev` stops without punctuation and either `line` starts in
+    lower case or with a digit ("by\n3 December"), or `prev` ends on a lower-case
+    word ("booked for\nDecember 9"). So a PDF's separate lines ("Amount due: 84.20"
+    then "Please pay by ...") stay separate, but hand-wrapped sentences rejoin."""
+    prev = prev.rstrip()
+    if not prev or prev[-1] in ".!?:;,)":
+        return False
+    return line[:1].islower() or line[:1].isdigit() or prev[-1].islower()
+
+
 def _logical_lines(body):
     """Rejoin lines the file wrapped by hand; bullets, table rows and blank lines start new ones."""
     lines = []
@@ -32,7 +45,7 @@ def _logical_lines(body):
         if not stripped:
             lines.append("")
         elif lines and lines[-1] and not BULLET.match(raw) and not stripped.startswith("|") \
-                and not lines[-1].lstrip().startswith("|"):
+                and not lines[-1].lstrip().startswith("|") and _continues(lines[-1], stripped):
             lines[-1] += " " + stripped
         else:
             lines.append(raw)

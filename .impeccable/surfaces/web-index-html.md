@@ -1,5 +1,5 @@
 ---
-version: 1
+version: 2
 slug: "web-index-html"
 primary_target: "web/index.html"
 related_targets: []
@@ -7,28 +7,20 @@ related_targets: []
 
 ## Scope
 
-`GET /` of the roost service: the single page for asking questions and re-ingesting. Mode: **Operate**. Phone first (390px), recorded on desktop too.
+`GET /` of the roost service: the whole product in one page, signed out and signed in. Mode: **Operate**. Phone first (390px), recorded on desktop for the demo.
 
 ## Audience and task
 
-Hackathon judges, mostly through a labelled Playwright video, sometimes live with a token; then the owner on a phone. Task: paste token once, ask or tap a sample question, read the typed decision, optionally re-ingest. States: no token, loading, answered, not answered, error (401/403/409/502/503), ingest running and done.
+Anyone who has bills, bookings and letters, including non-technical people; hackathon judges try it live or watch the labelled demo. Tasks: sign in with an email code, add documents (upload, samples, or forward an email), see what is due, turn reminders on, ask a question, delete the account. States: signed out, code sent, signing in, link expired, roost full, empty (no documents / nothing due), loading, upload limits, errors, reminders on/off, confirm remove, confirm delete account.
 
 ## Direction contract
 
-THESIS: each answer is set as a numbered data sheet; refuses the chat thread and the rounded-card dashboard.
-OWN-WORLD: white sheet, #121212 ink, #6b6b6b secondary, 1px black rules, Schibsted Grotesk (self-hosted, OFL) in two weights with tabular figures on dates, square priority marks (filled / half / open), highlighter yellow #ffd60a only behind the action line; focus is a black outline.
-STORY: judges see a question become six typed fields traced to one quoted line from a real file.
-FIRST VIEWPORT: lowercase roost mark and nest status top; a large ruled question field; the sheet directly below with rows 1–6, the action line highlighted and captioned with the list it was quoted from; sample questions follow (unnumbered: the order carries no meaning).
-FORM: Swiss Data Sheet, position 6 of my ordered list, seed 1913b63f. Signature: rows set in sequence, then the highlighter sweeps the action line.
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
-
-## Raises kept from declined challengers
-
-- Emission-line rail: priority as mark form, never hue alone.
-- Orienteering map: the one signal colour reserved for the action line.
-- Cassette j-card: relative due ("in 15 days") and scores right-aligned. Tabular figures only on dates: Schibsted's tnum also widens `.` and `,`, so scores stay proportional.
-- Midnight transit: only the winning source at full ink; other matches a value step down.
+THESIS: one dark column of plain-language sections, with the next thing to do marked in yellow; refuses the chat thread, the busy dashboard and the cute bird theme.
+OWN-WORLD: night #111 ground, #1b1b1b cards, #262626 inner surfaces, #f4f4f2 text, #a6a6a6 secondary, Schibsted Grotesk (self-hosted, OFL) in two weights, soft corners on a fixed scale, square urgency marks (filled / half / open) with words, yellow #ffd60a only on the next line, soft red #ff8a7a for lateness and destructive actions.
+STORY: "Never miss what your documents say is due": documents in, every date found, a morning email before each one.
+FIRST VIEWPORT (signed out): mark, display headline, lede, three numbered steps, then the sign-in card. (Signed in): Coming up first, grouped Overdue / This week / Later.
+FINISH: audited Nov 26 (axe 0 violations signed out and in, desktop and phone; 44px targets; inline confirms move focus).
 
 ## Unresolved
 
-- No nest-count endpoint exists; status comes from the last ingest response this session.
+- Forwarded email: only the text is read; attachments need uploading (connector limit).

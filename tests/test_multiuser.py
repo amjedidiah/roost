@@ -14,11 +14,12 @@ from pathlib import Path
 
 import accounts
 import digest
+import inbox
 import userspace
 from due import extract_items, upcoming
 from extract import ExtractError, text_from
 from ingest import chunk_text
-from tests.fakes import FakeBox, FakeMail, FakeNest
+from tests.fakes import FakeBox, FakeInbox, FakeMail, FakeNest
 
 SAMPLES = Path(__file__).resolve().parent.parent / "sample-docs"
 NOW = dt.datetime(2026, 11, 26, 9, 0, tzinfo=dt.timezone.utc)
@@ -164,6 +165,17 @@ class DueTest(unittest.TestCase):
         self.assertEqual(item["kind"], "todo")
         self.assertTrue(item["line"].startswith("Chase Calder"))
 
+    def test_pdf_lines_stay_apart_but_wrapped_sentences_rejoin(self):
+        pdf_text = ("Northgrid Energy - Electricity bill\n"
+                    "Period: 20 October 2026 to 19 November 2026\n"
+                    "Amount due: 84.20\n"
+                    "Please pay by 12 December 2026 to avoid a late fee.\n"
+                    "Payment due date\n"
+                    "15 January 2027\n")
+        lines = [i["line"] for i in extract_items(chunk_text(pdf_text), TODAY)]
+        self.assertEqual(lines, ["Please pay by 12 December 2026 to avoid a late fee.",
+                                 "Payment due date 15 January 2027"])
+
     def test_mixed_line_takes_the_deadline_date(self):
         lines = [i["line"] for i in self.items("2026-tax-receipts.md")]
         self.assertIn("Return due 30 April 2027", lines)
@@ -292,6 +304,74 @@ class UserspaceTest(TempData):
         self.assertNotEqual(accounts.verify_code("ada@example.com", code, NOW), self.uid)
 
 
+class InboxTest(TempData):
+    def setUp(self):
+        super().setUp()
+        self.box, self.mail = FakeBox(), FakeInbox()
+        userspace._users_folder.clear()
+        _, code = accounts.start_signin("ada@example.com", NOW)
+        self.ada = accounts.verify_code("ada@example.com", code, NOW)
+        _, code = accounts.start_signin("bo@example.com", NOW)
+        self.bo = accounts.verify_code("bo@example.com", code, NOW)
+
+    def test_forwarded_email_becomes_a_document_once(self):
+        self.mail.add("Ada <ADA@example.com>", "Fwd: Water bill",
+                      "---------- Forwarded message ---------\nAmount due: 41.00\nPlease pay by 10 December 2026.")
+        result = inbox.poll(self.box, FakeNest, self.mail)
+        self.assertEqual(result, {self.ada: {"added": ["Water bill.txt"], "skipped": []}})
+        self.assertEqual([d["name"] for d in userspace.documents(self.ada)], ["Water bill.txt"])
+        self.assertEqual(userspace.due(self.ada, TODAY)[0]["due"], "2026-12-10")
+        self.assertEqual(inbox.poll(self.box, FakeNest, self.mail), {})  # not added twice
+        self.assertEqual(userspace.documents(self.bo), [])
+
+    def test_strangers_roost_itself_and_attachments(self):
+        self.mail.add("stranger@example.com", "Fwd: bill", "Pay by 10 December 2026 or else, please.")
+        self.mail.add("roost-nest@agentmail.to", "Your roost sign-in code: 123456", "Your code is 123456 ok")
+        self.mail.add("bo@example.com", "Fwd: Gas", "", attachments=[{"filename": "gas.pdf"}])
+        result = inbox.poll(self.box, FakeNest, self.mail)
+        self.assertEqual(list(result), [self.bo])
+        self.assertEqual(result[self.bo]["added"], [])
+        self.assertIn("attachments", result[self.bo]["skipped"][0]["reason"])
+        self.assertEqual(len(read_done()), 3)
+
+    def test_html_only_email_and_only_uid(self):
+        self.mail.add("bo@example.com", "FW: Hotel booking",
+                      html="<p>Check-in <b>12 December 2026</b></p><p>Cancel before 5 December 2026 for a refund.</p>")
+        self.mail.add("ada@example.com", "Note", "Renew the passport by 1 March 2027, please.")
+        self.assertEqual(list(inbox.poll(self.box, FakeNest, self.mail, only_uid=self.ada)), [self.ada])
+        self.assertEqual(len(read_done()), 1)  # Bo's email waits for Bo
+        result = inbox.poll(self.box, FakeNest, self.mail)
+        self.assertEqual(result[self.bo]["added"], ["Hotel booking.txt"])
+        self.assertTrue(any(i["due"] == "2026-12-05" for i in userspace.due(self.bo, TODAY)))
+
+    def test_smoke_mail_counts_only_while_fresh(self):
+        _, code = accounts.start_signin("roost-nest@agentmail.to", NOW, test=True)
+        tester = accounts.verify_code("roost-nest@agentmail.to", code, NOW)
+        old = self.mail.add("roost-nest@agentmail.to", "roost-smoke: Fwd: Old bill", "Please pay by 10 December 2026, thanks.")
+        self.mail.get(old)["timestamp"] = "2026-11-26T07:00:00Z"
+        self.mail.add("roost-nest@agentmail.to", "roost-smoke: Fwd: New bill", "Please pay by 10 December 2026, thanks.")
+        result = inbox.poll(self.box, FakeNest, self.mail, now=dt.datetime(2026, 11, 26, 8, 10, tzinfo=dt.timezone.utc))
+        self.assertEqual(result[tester]["added"], ["New bill.txt"])
+
+    def test_limits_apply(self):
+        for n in range(userspace.MAX_FILES):
+            userspace.upload(self.ada, f"n{n}.md", b"hello", self.box, FakeNest)
+        self.mail.add("ada@example.com", "Fwd: one more", "Pay by 10 December 2026, thanks a lot.")
+        result = inbox.poll(self.box, FakeNest, self.mail)
+        self.assertEqual(result[self.ada]["added"], [])
+        self.assertIn("up to", result[self.ada]["skipped"][0]["reason"])
+
+    def test_names(self):
+        self.assertEqual(inbox.document_name("Re: FWD: Fw: Council tax / 2027", "2026-11-26T08"), "Council tax 2027.txt")
+        self.assertEqual(inbox.document_name("roost-smoke: Fwd: Water", ""), "Water.txt")
+        self.assertEqual(inbox.document_name("", "2026-11-26T08:00"), "Forwarded email 2026-11-26.txt")
+
+
+def read_done():
+    from store import read_json
+    return read_json(inbox._state_path(), {"done": []})["done"]
+
+
 class MailBudgetTest(TempData):
     def test_users_and_tests_have_separate_budgets(self):
         import mail
@@ -360,8 +440,10 @@ class ApiTest(TempData):
         import service
         self.service = service
         self.box, self.mail = FakeBox(), FakeMail()
-        self._seams = (service.make_box, service.make_nest, service.send_mail)
+        self._seams = (service.make_box, service.make_nest, service.send_mail, service.make_inbox)
+        self.inbox = FakeInbox()
         service.make_box, service.make_nest, service.send_mail = (lambda: self.box), FakeNest, self.mail
+        service.make_inbox = lambda: self.inbox
         userspace._users_folder.clear()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), service.Handler)
         self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
@@ -371,7 +453,8 @@ class ApiTest(TempData):
     def tearDown(self):
         self.server.shutdown()
         self.server.server_close()
-        self.service.make_box, self.service.make_nest, self.service.send_mail = self._seams
+        (self.service.make_box, self.service.make_nest, self.service.send_mail,
+         self.service.make_inbox) = self._seams
         super().tearDown()
 
     def call(self, method, path, body=None, headers=None, csrf=True, raw=None):
@@ -427,6 +510,13 @@ class ApiTest(TempData):
 
         self.assertEqual(self.call("POST", "/api/auth/signout")[0], 200)
         self.assertEqual(self.call("GET", "/api/due")[0], 401)
+
+    def test_check_for_changes_reads_forwarded_email(self):
+        self.sign_in()
+        self.inbox.add("ada@example.com", "Fwd: Phone bill", "Please pay by 10 December 2026 to keep the line.")
+        status, _, body = self.call("POST", "/api/sync")
+        self.assertEqual((status, body["forwarded"]["added"]), (200, ["Phone bill.txt"]))
+        self.assertEqual([d["name"] for d in body["documents"]], ["Phone bill.txt"])
 
     def test_csrf_header_required(self):
         self.sign_in()

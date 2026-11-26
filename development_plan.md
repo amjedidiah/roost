@@ -81,8 +81,9 @@ credential.
       service: `sprite-env services create roost --cmd python3 --args /home/sprite/roost/service.py
       --dir /home/sprite/roost --http-port 8080` (Sprite user is `sprite`, not root)
 - [x] `sprite config update --url-auth public` → confirm the public URL responds
-- [ ] Prove persistence: write a file, force idle, wake, file still there
-      (blocked: couldn't force a real pause; see the Nov 25 test note above)
+- [x] ~~Prove persistence: write a file, force idle, wake, file still there~~ Not needed (Nov 26):
+      couldn't force a real pause (see the Nov 25 test note above), and the decision below keeps the
+      service always running, so the Sprite never sleeps during judging. State is on disk regardless
 - [x] **Decision (Nov 25):** leave the `roost` service always running, so the Sprite stays awake
       through judging. Check the Fly dashboard usage page to confirm it fits the Free plan.
 
@@ -144,9 +145,10 @@ credential.
 
 - [x] `README`: what it does, the two connectors, run steps, the "triggered not scheduled" caveat
 - [x] Web page at `GET /` (Swiss Data Sheet design via impeccable): token field, sample questions, decision
-      sheet, nest list, re-ingest. Token-only access; judges get a token on request
-- [ ] 60–90 s screen demo (Playwright recording with labels): `/ingest` my Box docs → `/ask` → show the typed decision → re-ask to show
-      the nest remembers (video = "bonus points" per rules)
+      sheet, nest list, re-ingest. Token-only access; judges get a token on request. **Superseded Nov 26** by
+      the multi-user dark page (Phase 6); the token page and its routes are gone
+- [ ] 60–90 s screen demo (Playwright recording with labels), new story: sign in → try samples → Coming up →
+      upload a PDF bill → reminder email → ask → delete account (video = "bonus points" per rules)
 - [x] `sprite checkpoint create --comment "MVP working"` before recording (checkpoint `v5`, Nov 25)
 - [ ] Post on X / Bluesky / LinkedIn / Reddit with the demo, **tag @flydotio**
 - [ ] Submit the form: code link + demo link + 1–2 sentence description
@@ -276,16 +278,49 @@ submission the live site is frozen until judging ends (a staging Sprite only if 
       Then: tests never use real users' limits. A sign-in request carrying the owner token is a test
       sign-in: it skips the per-email and global hourly limits and the user cap, and doesn't count
       towards them; the account is marked `test` (no daily digest). Email budgets are split: users 90 a
-      day, tests 8 (`mail.send(kind=...)`). `smoke.sh` sends the token over stdin, never stored on the
+      day, tests 8 (`mail.send(kind=...)`); rebalanced the same day to users 88, tests 10. `smoke.sh` sends the token over stdin, never stored on the
       Sprite. Page got a "Delete my account" section (inline confirm). 72 tests pass.
-- [ ] 7. Reminders: digest, `/internal/*`, GitHub Actions workflow, "send me one now"
+- [x] 7. Reminders: digest, `/internal/*`, GitHub Actions workflow, "send me one now"
 - [x] 8. `.docx` extraction (stdlib `zipfile` + XML)
 - [x] 9. Deploy to `roost`, end-to-end test with a real sign-in, checkpoint. Nov 26: full deploy (new page
       live), `smoke.sh` 13/13 with the test path, live state clean (0 users), checkpoint taken
-- [ ] 10. Docs: README, AGENTS.md, PRODUCT.md, DESIGN.md (dark), plan
-- [ ] 11. Optional: PDF via `poppler-utils`; forward-a-bill-by-email into the inbox
+- [x] 10. Docs: README, AGENTS.md, PRODUCT.md, DESIGN.md (dark), plan
+- [x] 11. Optional: PDF via `poppler-utils`; forward-a-bill-by-email into the inbox (text only; see F5, F6)
 - [ ] 12. After judging (Dec 1): `POST /internal/delete-user {all: true}`, then delete `roost/users` in the
       Box web app
+
+### Finishing batch (Nov 26, agreed with the owner; order chosen so docs are written once)
+
+- [x] F1. Daily schedule: `.github/workflows/daily.yml` (cron 06:00 UTC = 07:00 WAT, plus manual run)
+      calls `POST /internal/sync-all` then `POST /internal/digest` with the `ROOST_TOKEN` repo secret
+      (owner added it Nov 26). Pushing is needed for it to run
+- [x] F2. Retire the single-user owner routes `GET /ask`, `GET /nest`, `POST /ingest`; clear the `me`
+      namespace (47 vectors) and its `data/nest.json` + `data/history/` on the Sprite
+- [x] F3. Phase 1 "prove persistence" item: mark not needed (service always on) with the reason
+- [x] F4. Delete the local `backup/pre-trim` branch
+- [x] F5. PDF: install `poppler-utils` on the Sprite (apt), test real PDFs end to end
+- [x] F6. Forward a bill: email from your sign-in address to `roost-nest@agentmail.to` becomes a
+      document in your space (body as text, plus readable attachments). Read on "Check for changes" and
+      in the daily run; only senders that match an account; processed message ids kept on disk; limits
+      apply. Page tells users the address
+      Done Nov 26: `inbox.py`. The AgentMail connector forwards list/get message but **not** the
+      attachment endpoints (403 "endpoint is not supported"), and the Sprite holds no key, so only the
+      email's text is read (HTML-only mail is converted); attachments are reported back as "upload
+      instead". PDF line-joining fixed for layout text (`due._continues`). Gateway GETs retry on
+      502/503/504. Smoke test now forwards a bill too: 15/15 live. 79 tests pass
+- [x] F7. Accessibility and quality pass on the page (impeccable audit), fix what it finds. Nov 26:
+      axe (WCAG 2.2 AA + best practice) 0 violations signed out and in, desktop and phone, after
+      fixes: **phone sign-in inputs collapsed to 23px** (`flex: 1` with a 0 basis in a column row),
+      no h1 when signed in, pills 40→44px, switch and logo hit areas, focus lost after inline remove
+      confirm, usage bar animated `width` (now `scaleX`). Detector clean after the DESIGN.md rewrite
+- [x] F8. Docs: README, AGENTS.md, PRODUCT.md, DESIGN.md + `.impeccable/design.json` for the dark design
+- [x] F9. Live run-through on desktop and phone (real browser, test sign-in), then delete the account.
+      Nov 26: sign-in by code, samples (10 items), **PDF upload on live** (bill.pdf: 2 dates, the 12 Dec
+      payment in Coming up), reminders switch, send me one now, ask, check for changes, phone layout (no
+      overflow), remove, delete account; no page errors, no 5xx. Found and fixed: a smoke run's leftover
+      forwarded email landed in the next test account (smoke mail now counts only for 30 minutes and has
+      a unique name). Live state after: 0 users, 0 sessions, no vectors. Checkpoint taken
+- [x] F10. Plan update, commit and push
 
 **Then Phase 5 continues** with the new story: demo (Playwright with labels), post tagging
 @flydotio, form.

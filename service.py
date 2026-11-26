@@ -7,7 +7,6 @@ Routes
               POST /api/upload, /api/samples, /api/documents/<id>/delete, /api/sync,
                    /api/settings, /api/digest/test, /api/account/delete
   Owner       X-Roost-Token: POST /internal/sync-all, /internal/digest, /internal/delete-user
-              (and the original single-user GET /ask, GET /nest, POST /ingest)
 
 Signed-in requests use the `roost_session` cookie. Every POST under /api/ must
 also send `X-Requested-With: roost`, which a cross-site form cannot do.
@@ -20,7 +19,6 @@ import os
 import re
 import signal
 import sys
-import threading
 import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,10 +29,9 @@ import auth
 import digest
 import gateway
 import mail
+import inbox
 import userspace
-from ask import ask
 from box import Box
-from ingest import data_dir, ingest, load_state
 from nest import Nest
 
 PORT = int(os.environ.get("PORT", "8080"))
@@ -52,17 +49,9 @@ PAGE_CSP = ("default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 's
 make_box = Box
 make_nest = Nest
 send_mail = mail.send
+make_inbox = inbox.AgentMailInbox
 
-_ingest_lock = threading.Lock()
 DELETE_PATH = re.compile(r"^/api/documents/(\d{1,20})/delete$")
-
-
-def nest_status():
-    """What is in the owner's nest, from the ingest state. Read-only; no gateway calls."""
-    state = load_state(data_dir() / "nest.json")
-    files = sorted(({"name": f["name"], "chunks": f["chunks"], "modified_at": f.get("modified_at", "")}
-                    for f in state["files"].values()), key=lambda f: f["name"].lower())
-    return {"files": files, "count": len(files), "chunks": sum(f["chunks"] for f in files)}
 
 
 def signin_email(code, token):
@@ -211,14 +200,6 @@ class Handler(BaseHTTPRequestHandler):
                 question = self._query().get("q", [""])[0].strip()
                 if self._question_ok(question):
                     self._guarded(lambda: userspace.ask(uid, question, make_nest))
-        elif path == "/ask":
-            if self._owner():
-                question = self._query().get("q", [""])[0].strip()
-                if self._question_ok(question):
-                    self._guarded(lambda: ask(question, make_nest()))
-        elif path == "/nest":
-            if self._owner():
-                self._guarded(nest_status)
         else:
             self._error(404, "Not found.")
 
@@ -274,17 +255,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._api_post(path)
         elif path == "/internal/sync-all":
             if self._owner():
-                self._guarded(lambda: {uid: _summary(userspace.sync(uid, make_box(), make_nest))
-                                       for uid in accounts.users()})
+                self._guarded(_sync_all)
         elif path == "/internal/digest":
             if self._owner():
                 self._guarded(lambda: digest.run(send_mail))
         elif path == "/internal/delete-user":
             if self._owner():
                 self._guarded(self._owner_delete)
-        elif path == "/ingest":
-            if self._owner():
-                self._owner_ingest()
         else:
             self._error(404, "Not found.")
 
@@ -339,8 +316,13 @@ class Handler(BaseHTTPRequestHandler):
             self._guarded(lambda: {"documents": userspace.delete(uid, file_id, make_box(), make_nest),
                                    "usage": userspace.usage(uid)})
         elif path == "/api/sync":
-            self._guarded(lambda: {"summary": _summary(userspace.sync(uid, make_box(), make_nest)),
-                                   "documents": userspace.documents(uid), "usage": userspace.usage(uid)})
+            def sync():
+                box = make_box()
+                forwarded = inbox.poll(box, make_nest, make_inbox(), only_uid=uid).get(uid)
+                return {"summary": _summary(userspace.sync(uid, box, make_nest)),
+                        "forwarded": forwarded or {"added": [], "skipped": []},
+                        "documents": userspace.documents(uid), "usage": userspace.usage(uid)}
+            self._guarded(sync)
         elif path == "/api/settings":
             def settings():
                 data = self._json_body()
@@ -370,14 +352,24 @@ class Handler(BaseHTTPRequestHandler):
         box = make_box()
         return {"deleted": [userspace.erase(uid, box, make_nest) for uid in uids]}
 
-    def _owner_ingest(self):
-        if not _ingest_lock.acquire(blocking=False):
-            self._error(409, "An ingest is already running.")
-            return
+
+
+def _sync_all():
+    """Read forwarded email, then re-read every user's documents; one failure doesn't stop the rest."""
+    box, results = make_box(), {}
+    try:
+        forwarded = inbox.poll(box, make_nest, make_inbox())
+    except Exception as e:
+        print(f"inbox poll failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        forwarded = {}
+    for uid in accounts.users():
         try:
-            self._guarded(lambda: ingest(make_box(), make_nest()))
-        finally:
-            _ingest_lock.release()
+            results[uid] = {**_summary(userspace.sync(uid, box, make_nest)),
+                            "forwarded": len((forwarded.get(uid) or {}).get("added", []))}
+        except Exception as e:
+            print(f"sync {uid} failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+            results[uid] = {"error": type(e).__name__}
+    return results
 
 
 def _summary(s):

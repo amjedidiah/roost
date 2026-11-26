@@ -25,6 +25,7 @@
   --muted: #a6a6a6;
   --signal: #ffd60a;
   --danger: #ff8a7a;
+  --bright: #ffffff;
   --face: "Schibsted Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
@@ -49,6 +50,7 @@ body {
 ::selection { background: var(--text); color: var(--night); }
 a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 :focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+h2[tabindex="-1"]:focus { outline: none; }
 button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 [hidden] { display: none !important; }
@@ -68,12 +70,12 @@ button { cursor: pointer; }
   white-space: nowrap;
   transition: background-color .2s var(--ease), transform .2s var(--ease);
 }
-.btn:hover { background: #ffffff; }
+.btn:hover { background: var(--bright); }
 .btn:active { transform: scale(.98); }
 .btn:disabled { background: var(--raised); color: var(--muted); cursor: default; transform: none; }
 
 .pill {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 var(--s4);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -113,6 +115,7 @@ button { cursor: pointer; }
 
 .card { padding: var(--s5); border-radius: var(--r-lg); background: var(--card); }
 .muted { color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .note { margin: var(--s3) 0 0; font-size: 15px; }
 .note:empty { display: none; }
 .note.bad { color: var(--danger); }
@@ -120,7 +123,7 @@ button { cursor: pointer; }
 /* ---------- top bar ---------- */
 
 .top { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); padding-block: var(--s5); }
-.mark { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; text-decoration: none; }
+.mark { display: inline-block; padding-block: 6px; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; text-decoration: none; }
 .who { display: flex; align-items: center; gap: var(--s3); min-width: 0; font-size: 14px; }
 .who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 
@@ -213,7 +216,7 @@ h1 {
 
 .usage { font-size: 14px; color: var(--muted); }
 .bar { height: 6px; margin-top: var(--s2); border-radius: 999px; background: var(--raised); overflow: hidden; }
-.bar i { display: block; height: 100%; background: var(--text); border-radius: 999px; transition: width .4s var(--ease); }
+.bar i { display: block; height: 100%; background: var(--text); border-radius: 999px; transform: scaleX(0); transform-origin: left; transition: transform .4s var(--ease); }
 
 .drop {
   display: grid;
@@ -228,6 +231,8 @@ h1 {
 }
 .drop.over { border-color: var(--text); background: var(--card); }
 .drop p { margin: 0; font-size: 14px; color: var(--muted); }
+.forward { margin: var(--s3) 0 0; font-size: 14px; color: var(--muted); }
+.forward b { color: var(--text); font-weight: 400; user-select: all; overflow-wrap: anywhere; }
 
 .docs { display: grid; gap: var(--s2); margin: var(--s4) 0 0; padding: 0; list-style: none; }
 .doc { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--card); }
@@ -251,6 +256,7 @@ h1 {
   background: var(--raised);
   transition: background-color .2s var(--ease);
 }
+.switch::before { content: ""; position: absolute; inset: -6px -4px; }
 .switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--muted); transition: transform .25s var(--ease), background-color .2s var(--ease); }
 .switch[aria-checked="true"] { background: var(--text); }
 .switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--night); }
@@ -273,7 +279,7 @@ h1 {
 .answer .todo mark { color: var(--night); background: var(--signal); padding: .03em .18em; border-radius: 4px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); margin: var(--s4) 0 0; }
 .fact { margin: 0; padding: var(--s3) var(--s4); border-radius: var(--r-sm); background: var(--raised); }
-.fact dt { font-size: 13px; color: var(--muted); }
+.fact dt { font-size: 14px; color: var(--muted); }
 .fact dd { margin: var(--s1) 0 0; font-weight: 700; }
 .fact dd small { display: block; font-weight: 400; font-size: 14px; color: var(--muted); }
 .quote { margin: var(--s4) 0 0; padding: var(--s4); border-radius: var(--r-sm); background: var(--night); font-size: 15px; line-height: 1.55; }
@@ -299,6 +305,7 @@ h1 {
 
 @media (max-width: 480px) {
   .row { flex-direction: column; }
+  .row .field { flex: none; }
   .row .btn { width: 100%; }
   .item { grid-template-columns: 52px minmax(0, 1fr); gap: var(--s3); }
   .date b { font-size: 20px; }
@@ -324,7 +331,7 @@ h1 {
     </section>
 
     <ol class="steps" aria-label="How roost works">
-      <li><div><b>Add your documents.</b> <span>Word or text files, or try the sample ones.</span></div></li>
+      <li><div><b>Add your documents.</b> <span>PDF, Word or text files, or try the sample ones.</span></div></li>
       <li><div><b>roost finds the dates.</b> <span>Only what is written in your files, never guessed.</span></div></li>
       <li><div><b>Get a reminder.</b> <span>A short email the week something is due.</span></div></li>
     </ol>
@@ -358,6 +365,7 @@ h1 {
 
   <!-- ===================== signed in ===================== -->
   <main id="inView" hidden>
+    <h1 class="sr-only">Your roost: what's due, your documents and reminders</h1>
     <section class="section" aria-labelledby="dueTitle" style="margin-top: var(--s5)">
       <div class="section-head">
         <h2 id="dueTitle">Coming up</h2>
@@ -368,16 +376,17 @@ h1 {
 
     <section class="section" aria-labelledby="docsTitle">
       <div class="section-head">
-        <h2 id="docsTitle">Your documents</h2>
+        <h2 id="docsTitle" tabindex="-1">Your documents</h2>
         <button class="pill" id="syncBtn" type="button">Check for changes</button>
       </div>
       <div class="usage" id="usage"></div>
-      <div class="bar" aria-hidden="true"><i id="usageBar" style="width:0"></i></div>
+      <div class="bar" aria-hidden="true"><i id="usageBar"></i></div>
       <div class="drop" id="drop">
         <button class="btn" id="addBtn" type="button">Add a document</button>
         <p id="dropHint">or drop a file here</p>
         <input id="file" type="file" hidden>
       </div>
+      <p class="forward">Got a bill by email? Forward it to <b>roost-nest@agentmail.to</b> from <span id="fwdFrom">your sign-in address</span>. roost reads the email's text when it next checks for changes, or each morning. Attachments can't be read, so upload those here.</p>
       <p class="note" id="docsNote" role="status" aria-live="polite"></p>
       <ul class="docs" id="docs"></ul>
     </section>
@@ -609,16 +618,19 @@ h1 {
     if (usage) {
       me.usage = usage;
       $("usage").textContent = `${usage.files} of ${usage.max_files} documents · ${mb(usage.bytes)} of ${mb(usage.max_bytes)}`;
-      $("usageBar").style.width = `${Math.min(100, Math.max(usage.files / usage.max_files, usage.bytes / usage.max_bytes) * 100)}%`;
+      $("usageBar").style.transform = `scaleX(${Math.min(1, Math.max(usage.files / usage.max_files, usage.bytes / usage.max_bytes))})`;
       $("dropHint").textContent = `or drop a file here · ${usage.types.map((t) => "." + t).join(", ")} · up to ${mb(usage.max_file_bytes)}`;
       $("file").setAttribute("accept", usage.types.map((t) => "." + t).join(","));
     }
     $("docs").replaceChildren(...list.map((d) => {
       const actions = el("div", { class: "doc-actions" });
-      const askRemove = () => actions.replaceChildren(
-        el("span", { class: "muted" }, "Remove?"),
-        el("button", { class: "link danger", type: "button", onclick: () => removeDoc(d) }, "Yes, remove"),
-        el("button", { class: "link quiet", type: "button", onclick: () => actions.replaceChildren(removeBtn()) }, "Cancel"));
+      const askRemove = () => {
+        const yes = el("button", { class: "link danger", type: "button", onclick: () => removeDoc(d), "aria-label": `Yes, remove ${d.name}` }, "Yes, remove");
+        actions.replaceChildren(
+          el("span", { class: "muted" }, "Remove?"), yes,
+          el("button", { class: "link quiet", type: "button", onclick: () => { const back = removeBtn(); actions.replaceChildren(back); back.focus(); } }, "Cancel"));
+        yes.focus();
+      };
       const removeBtn = () => el("button", { class: "link quiet", type: "button", onclick: askRemove, "aria-label": `Remove ${d.name}` }, "Remove");
       actions.append(removeBtn());
       return el("li", { class: "doc" },
@@ -677,6 +689,7 @@ h1 {
       const data = await api("POST", `/api/documents/${encodeURIComponent(d.id)}/delete`);
       renderDocs(data.documents, data.usage);
       say("docsNote", `${d.name} removed.`);
+      $("docsTitle").focus();  // the row that had focus is gone
       await refreshDue();
     } catch (err) {
       say("docsNote", err.message, true);
@@ -695,7 +708,13 @@ h1 {
     try {
       const data = await api("POST", "/api/sync");
       renderDocs(data.documents, data.usage);
-      say("docsNote", `Checked Box. ${summarise(data.summary)}`);
+      const fw = data.forwarded || { added: [], skipped: [] };
+      const parts = [];
+      if (fw.added.length) parts.push(`Added from your email: ${fw.added.join(", ")}.`);
+      const changes = summarise(data.summary);
+      if (!fw.added.length || changes !== "No changes.") parts.push(changes);
+      if (fw.skipped.length) parts.push(`Not added from your email: ${fw.skipped.map((k) => `${k.name} (${k.reason})`).join("; ")}`);
+      say("docsNote", `Checked for changes. ${parts.join(" ")}`, fw.skipped.length > 0 && !fw.added.length);
       await refreshDue();
     } catch (err) {
       say("docsNote", err.message, true);
@@ -827,6 +846,7 @@ h1 {
       return;
     }
     $("whoEmail").textContent = me.email;
+    $("fwdFrom").textContent = me.email;
     renderReminders();
     renderDelete();
     say("delNote", "");

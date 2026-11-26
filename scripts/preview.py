@@ -1,15 +1,16 @@
 """Local preview of the web page, before deploying it.
 
 Serves web/index.html and web/assets/ from this working copy, and forwards the
-API calls (/ask, /nest, /ingest, /healthz) to the live Sprite, because Box and
-Pinecone are only reachable from inside the Sprite. The page you see is local;
-the answers are real.
+API calls (/api/*, /auth, /internal/*, /healthz) to the live Sprite, because
+Box, Pinecone and AgentMail are only reachable from inside the Sprite. The page
+you see is local; the data is real. Cookies and redirects are passed through so
+sign-in works on http://localhost.
 
-    python3 scripts/preview.py            # http://127.0.0.1:8765
+    python3 scripts/preview.py            # open http://localhost:8765 (not 127.0.0.1: cookie host)
     ROOST_URL=https://... PORT=9000 python3 scripts/preview.py
 
-Paste your access code (ROOST_TOKEN from .env) into the page once; the browser
-keeps it for this origin. Note that Refresh from Box runs a real ingest.
+Signing in here creates a real account on the live Sprite; delete it from the
+page when you're done.
 """
 
 import os
@@ -21,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent / "web"
 UPSTREAM = os.environ.get("ROOST_URL", "https://roost-b6xbd.sprites.app").rstrip("/")
 PORT = int(os.environ.get("PORT", "8765"))
-API = ("/api/", "/auth", "/internal/", "/ask", "/nest", "/ingest", "/healthz")
+API = ("/api/", "/auth", "/internal/", "/healthz")
 FORWARD = {"x-roost-token", "x-requested-with", "x-filename", "content-type", "cookie"}
 TYPES = {".html": "text/html; charset=utf-8", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8"}
 
@@ -87,5 +88,5 @@ class Preview(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Preview)
-    print(f"roost preview on http://127.0.0.1:{PORT} (API -> {UPSTREAM})", flush=True)
+    print(f"roost preview on http://localhost:{PORT} (API -> {UPSTREAM})", flush=True)
     server.serve_forever()

@@ -1,0 +1,38 @@
+# Wakes roost each morning: re-reads everyone's documents (Box changes and forwarded
+# emails), then emails each user with reminders on what is due within a week.
+# Sprites have no cron, so the schedule lives here. Needs the ROOST_TOKEN repo secret.
+name: daily
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC = 07:00 WAT
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ROOST_URL: https://roost-b6xbd.sprites.app
+      ROOST_TOKEN: ${{ secrets.ROOST_TOKEN }}
+    steps:
+      - name: Check the token is set
+        run: test -n "$ROOST_TOKEN" || { echo "::error::Add the ROOST_TOKEN repository secret"; exit 1; }
+
+      - name: Re-read everyone's documents
+        run: |
+          curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --max-time 600 \
+            -X POST -H "X-Roost-Token: $ROOST_TOKEN" "$ROOST_URL/internal/sync-all" \
+            | python3 -c 'import json,sys; r=json.load(sys.stdin); print(f"{len(r)} users synced")'
+
+      - name: Send reminder emails
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 300 \
+            -X POST -H "X-Roost-Token: $ROOST_TOKEN" "$ROOST_URL/internal/digest" \
+            | python3 -c 'import collections,json,sys; print(dict(collections.Counter(json.load(sys.stdin).values())))'

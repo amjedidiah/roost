@@ -1,4 +1,3 @@
-import json
 import os
 import tempfile
 import threading
@@ -19,10 +18,6 @@ class ServiceRoutesTest(unittest.TestCase):
         cls._old_data = os.environ.get("ROOST_DATA")
         os.environ["ROOST_DATA"] = str(cls.data)
         (cls.data / "token.sha256").write_text(token_hash("t0ken") + "\n")
-        (cls.data / "nest.json").write_text(json.dumps({"files": {
-            "2": {"name": "b.md", "sha1": "x", "chunks": 3},
-            "1": {"name": "a.md", "sha1": "y", "chunks": 2},
-        }}))
         import service
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), service.Handler)
         cls.base = f"http://127.0.0.1:{cls.server.server_address[1]}"
@@ -62,18 +57,14 @@ class ServiceRoutesTest(unittest.TestCase):
     def test_healthz_stays_plain(self):
         self.assertEqual(self.get("/healthz")[2], b"ok\n")
 
-    def test_nest_requires_token_and_lists_files(self):
-        self.assertEqual(self.get("/nest")[0], 401)
-        self.assertEqual(self.get("/nest", "wrong")[0], 403)
-        status, _, body = self.get("/nest", "t0ken")
-        self.assertEqual(status, 200)
-        nest = json.loads(body)
-        self.assertEqual((nest["count"], nest["chunks"]), (2, 5))
-        self.assertEqual([f["name"] for f in nest["files"]], ["a.md", "b.md"])
+    def test_single_user_routes_are_gone(self):
+        self.assertEqual(self.get("/nest", "t0ken")[0], 404)
+        self.assertEqual(self.get("/ask?q=x", "t0ken")[0], 404)
+        self.assertEqual(self.get("/ingest", "t0ken", method="POST")[0], 404)
 
     def test_head_only_on_static_routes(self):
         self.assertEqual(self.get("/", method="HEAD")[0], 200)
-        self.assertEqual(self.get("/ask?q=x", "t0ken", method="HEAD")[0], 405)
+        self.assertEqual(self.get("/api/me", method="HEAD")[0], 405)
 
     def test_unknown_path(self):
         self.assertEqual(self.get("/admin")[0], 404)

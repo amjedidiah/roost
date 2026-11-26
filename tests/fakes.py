@@ -90,3 +90,22 @@ class FakeMail:
 
     def __call__(self, to, subject, text, html=None, kind="user"):
         self.sent.append({"to": to, "subject": subject, "text": text, "html": html, "kind": kind})
+
+
+class FakeInbox:
+    """The roost inbox: messages by id, newest first."""
+
+    def __init__(self):
+        self.messages = []
+
+    def add(self, sender, subject, text="", html=None, attachments=None):
+        mid = f"<m{len(self.messages)}@example.com>"
+        self.messages.insert(0, {"message_id": mid, "from": sender, "subject": subject, "text": text,
+                                 "html": html, "attachments": attachments, "timestamp": "2026-11-26T08:00:00Z"})
+        return mid
+
+    def recent(self):
+        return [{k: m[k] for k in ("message_id", "from", "subject", "timestamp")} for m in self.messages]
+
+    def get(self, message_id):
+        return next(m for m in self.messages if m["message_id"] == message_id)
