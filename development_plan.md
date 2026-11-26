@@ -156,11 +156,13 @@ credential.
 - [ ] Keep Sprite + connectors live through Dec 1 (judging)
 - [ ] Check the daily reminder run each morning, Nov 27 – Dec 1 (`gh run list --workflow daily.yml --limit 1`;
       GitHub also emails the owner when a scheduled run fails)
-- [ ] `daily.yml` fails on server errors (Nov 26). Run steps without `shell:` use `bash -e` (no pipefail),
+- [x] `daily.yml` fails on server errors (Nov 26). Run steps without `shell:` use `bash -e` (no pipefail),
       so a 5xx with a JSON body passed green ("1 users synced") and sent no failure email. Fixed locally:
       `defaults.run.shell: bash` (pipefail) and the python step exits 1 on a top-level `"error"`. Logs stay
       counts only (no emails or uids; the token is masked; forks get no secrets). Push, then check with a
-      manual dispatch (`gh workflow run daily.yml`)
+      manual dispatch (`gh workflow run daily.yml`). Done Nov 26 (`0ff3de8`, run 45828241884): green,
+      steps ran with `-o pipefail`, log "3 users synced" and `{'sent': 2, 'nothing due': 1}`. The 2 sends
+      were real reminders to users who signed up that morning (one per day, so the next 06:00 run still sends)
 - [ ] HTML 404 for unknown page paths (today `/foo` shows raw `{"error": "Not found."}`); `/api/*` and
       `/internal/*` stay JSON. Dark design, link home. Local preview for the owner before deploy
 
