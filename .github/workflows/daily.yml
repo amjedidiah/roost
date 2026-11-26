@@ -10,6 +10,12 @@ on:
 
 permissions: {}
 
+# Without an explicit shell, run steps use `bash -e` (no pipefail): a failing curl
+# piped into python would still pass. `shell: bash` adds pipefail.
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: daily
   cancel-in-progress: false
@@ -29,10 +35,10 @@ jobs:
         run: |
           curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors --max-time 600 \
             -X POST -H "X-Roost-Token: $ROOST_TOKEN" "$ROOST_URL/internal/sync-all" \
-            | python3 -c 'import json,sys; r=json.load(sys.stdin); print(f"{len(r)} users synced")'
+            | python3 -c 'import json,sys; r=json.load(sys.stdin); "error" in r and sys.exit("::error::" + r["error"]); print(f"{len(r)} users synced")'
 
       - name: Send reminder emails
         run: |
           curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 300 \
             -X POST -H "X-Roost-Token: $ROOST_TOKEN" "$ROOST_URL/internal/digest" \
-            | python3 -c 'import collections,json,sys; print(dict(collections.Counter(json.load(sys.stdin).values())))'
+            | python3 -c 'import collections,json,sys; r=json.load(sys.stdin); "error" in r and sys.exit("::error::" + r["error"]); print(dict(collections.Counter(r.values())))'
