@@ -150,9 +150,12 @@ credential.
 - [ ] 60–90 s screen demo (Playwright recording with labels), new story: sign in → try samples → Coming up →
       upload a PDF bill → reminder email → ask → delete account (video = "bonus points" per rules)
 - [x] `sprite checkpoint create --comment "MVP working"` before recording (checkpoint `v5`, Nov 25)
+- [ ] Upload the demo (YouTube unlisted or Loom) for the form's demo link (owner)
 - [ ] Post on X / Bluesky / LinkedIn / Reddit with the demo, **tag @flydotio**
 - [ ] Submit the form: code link + demo link + 1–2 sentence description
 - [ ] Keep Sprite + connectors live through Dec 1 (judging)
+- [ ] Check the daily reminder run each morning, Nov 27 – Dec 1 (`gh run list --workflow daily.yml --limit 1`;
+      GitHub also emails the owner when a scheduled run fails)
 
 ## Phase 6 — "Never miss what's due", multi-user (Nov 25 → Nov 28)
 
@@ -321,6 +324,15 @@ submission the live site is frozen until judging ends (a staging Sprite only if 
       forwarded email landed in the next test account (smoke mail now counts only for 30 minutes and has
       a unique name). Live state after: 0 users, 0 sessions, no vectors. Checkpoint taken
 - [x] F10. Plan update, commit and push
+
+- [x] F11. Nov 26 fix after an owner test: "What is my Deel contract like?" against an uploaded 40-chunk
+      contract PDF was "No answer found" (best score 0.236 < 0.28). Causes: the file name ("deel-…-contract")
+      was never embedded, `pdftotext -layout` padded justified text with space runs, and the threshold was
+      tuned on short notes. Fix: each chunk is embedded as "Document: <name>\n<chunk>" (stored text
+      unchanged; `EMBED_VERSION` 2 re-embeds old files once), and PDF space runs are collapsed. Measured
+      on the Sprite: that question 0.224 → 0.374 (answered); sample on-topic questions mostly up (lease
+      0.359 → 0.396), off-topic unchanged or down (capital of France 0.179 → 0.084), same file chosen
+      for all ten. 82 tests pass
 
 **Then Phase 5 continues** with the new story: demo (Playwright with labels), post tagging
 @flydotio, form.

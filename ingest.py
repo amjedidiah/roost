@@ -104,6 +104,21 @@ def chunk_text(text, max_chars=MAX_CHUNK):
 
 # --- ingest ------------------------------------------------------------------
 
+# Bump when what gets embedded changes, so every file is re-embedded once.
+# 2: each chunk is embedded with its document's name (Nov 26).
+EMBED_VERSION = 2
+
+
+def embed_input(name, chunk):
+    """What gets embedded for a chunk: the document's name, then the chunk.
+
+    The name often says what the file is ("deel-contract.pdf") when the text
+    doesn't repeat it, so questions that name the document find it. Only the
+    vector sees this; the stored chunk text stays as it is."""
+    title = re.sub(r"[-_.]+", " ", name.rsplit(".", 1)[0]).strip()
+    return f"Document: {title}\n{chunk}"
+
+
 def chunk_ids(file_id, start, stop):
     return [f"{file_id}#{i}" for i in range(start, stop)]
 
@@ -138,7 +153,8 @@ def ingest(box, nest, state_path=None, folder_id=None, today=None):
         file_id = item["id"]
         seen.add(file_id)
         prev = state["files"].get(file_id)
-        if prev and prev["sha1"] == item.get("sha1") and prev["name"] == name and "due" in prev:
+        if prev and prev["sha1"] == item.get("sha1") and prev["name"] == name and "due" in prev \
+                and prev.get("v") == EMBED_VERSION:
             summary["unchanged"] += 1
             continue
 
@@ -154,7 +170,7 @@ def ingest(box, nest, state_path=None, folder_id=None, today=None):
             seen.discard(file_id)
             continue
 
-        vectors = nest.embed(chunks, "passage")
+        vectors = nest.embed([embed_input(name, c) for c in chunks], "passage")
         nest.upsert([
             {"id": cid, "values": vec, "metadata": {
                 "file_id": file_id, "file_name": name, "chunk_index": i,
@@ -171,7 +187,7 @@ def ingest(box, nest, state_path=None, folder_id=None, today=None):
 
         state["files"][file_id] = {"name": name, "sha1": item.get("sha1"), "chunks": len(chunks),
                                    "modified_at": item.get("modified_at", ""), "size": item.get("size", 0),
-                                   "due": extract_items(chunks, today)}
+                                   "due": extract_items(chunks, today), "v": EMBED_VERSION}
         summary["updated" if prev else "added"].append(name)
         save_state(state_path, state)
 

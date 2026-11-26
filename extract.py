@@ -7,6 +7,7 @@ works only when the `pdftotext` tool (poppler-utils) is installed.
 """
 
 import io
+import re
 import shutil
 import subprocess
 import zipfile
@@ -70,7 +71,9 @@ def _pdf(data):
         raise ExtractError("this PDF took too long to read") from None
     if done.returncode != 0:
         raise ExtractError("this PDF couldn't be read")
-    return done.stdout.decode("utf-8", "replace")
+    # -layout keeps a table's label and value on one line ("Due date    12 December"),
+    # but pads justified text with runs of spaces; collapse them.
+    return re.sub(r"[ \t]{2,}", " ", done.stdout.decode("utf-8", "replace"))
 
 
 def text_from(name, data):

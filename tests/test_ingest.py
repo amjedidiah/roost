@@ -89,6 +89,26 @@ class IngestTest(unittest.TestCase):
         self.assertEqual(s["chunks_upserted"], 0)
         self.assertEqual((self.box.downloads, self.nest.embedded), (downloads, embedded))
 
+    def test_chunks_are_embedded_with_the_document_name(self):
+        from ingest import embed_input
+        self.assertEqual(embed_input("deel-Turing_Remote.contract.pdf", "Pay terms"),
+                         "Document: deel Turing Remote contract\nPay terms")
+        self.box.put("1", "deel-contract.md", doc(1))
+        texts = []
+        real = self.nest.embed
+        self.nest.embed = lambda t, kind: (texts.extend(t), real(t, kind))[1]
+        self.run_ingest()
+        self.assertTrue(texts and all(t.startswith("Document: deel contract\n") for t in texts))
+
+    def test_older_embed_version_is_reembedded_once(self):
+        self.box.put("1", "lease.md", doc(3))
+        self.run_ingest()
+        state = json.loads(self.state.read_text())
+        state["files"]["1"].pop("v")  # as written before EMBED_VERSION 2
+        self.state.write_text(json.dumps(state))
+        self.assertEqual(self.run_ingest()["updated"], ["lease.md"])
+        self.assertEqual(self.run_ingest()["unchanged"], 1)
+
     def test_changed_file_is_reembedded_and_stale_chunks_deleted(self):
         self.box.put("1", "lease.md", doc(12))
         first = self.run_ingest()["chunks_upserted"]
