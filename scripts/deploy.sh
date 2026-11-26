@@ -6,7 +6,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 files="service.py auth.py accounts.py userspace.py digest.py mail.py inbox.py store.py extract.py due.py \
-       gateway.py box.py nest.py ingest.py decide.py ask.py scripts/smoke.py \
+       gateway.py box.py nest.py ingest.py decide.py ask.py rerank.py scripts/smoke.py \
        web/assets/schibsted-grotesk.woff2 web/assets/OFL.txt sample-docs/*.md"
 if [ "${1:-}" != "api" ]; then files="$files web/index.html"; fi
 for f in $files; do

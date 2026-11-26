@@ -334,6 +334,26 @@ submission the live site is frozen until judging ends (a staging Sprite only if 
       0.359 → 0.396), off-topic unchanged or down (capital of France 0.179 → 0.084), same file chosen
       for all ten. 82 tests pass
 
+- [x] F12. Rerank first, similarity as fallback (agreed Nov 26). Ask: Pinecone query top 8 (unchanged),
+      then `bge-reranker-v2-m3` through the Pinecone connector (`POST /rerank`, keyless; Starter: 500
+      requests/month, 60/min) re-scores those 8 (each sent as "Document: <name>" + chunk). The reranked
+      best picks the file and its score decides "answered" against a cut-off **calibrated on the Sprite**
+      (samples, the Deel contract, tricky and plain off-topic questions). Fallback to today's order and
+      0.28 cut-off when the monthly budget is spent (roost counts: users 430, tests 20, in
+      `data/rerank_log.json`), or on 429/5xx/timeout. Decisions carry `ranked_by` (rerank | similarity).
+      Coming up and reminders don't search, so they never use the allowance. Show before/after scores
+      to the owner before deploying
+      Built Nov 26 (`rerank.py`, `Nest.rerank`, `ask.py`); not yet deployed. Calibration (16 questions,
+      16 of the month's 500): the reranker is sure on specific questions (0.30-0.91), near zero
+      off-topic (<= 0.025), but low on broad ones ("what is my lease like" 0.004), so answered =
+      rerank >= 0.10, or similarity >= 0.28 and rerank >= 0.002. Same 9/9 on-topic answered; wrong
+      answers on off-topic/tricky 2 → 1 (gym membership now rejected). 88 tests pass
+      Deployed Nov 26 (server only). Live on the owner's test account: "What is my Deel contract like?"
+      answered (rerank 0.06, similarity 0.374), "when can the contract be terminated" answered from the
+      termination chunk (rerank 0.509), "when is my gym membership due" rejected (rerank 0.0). Usage
+      log: calibration 16, user 3. Smoke test (adds a rerank check) waits for the test email budget to
+      reset at 00:00 UTC
+
 **Then Phase 5 continues** with the new story: demo (Playwright with labels), post tagging
 @flydotio, form.
 

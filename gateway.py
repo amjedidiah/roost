@@ -5,6 +5,7 @@ signature, so no auth header is ever sent and no credential lives on the box.
 """
 
 import json
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -24,7 +25,7 @@ class GatewayError(Exception):
         self.body = body
 
 
-def request(method, url, body=None, headers=None, raw=False):
+def request(method, url, body=None, headers=None, raw=False, timeout=TIMEOUT):
     """Send a request. JSON-encodes `body` when it is not bytes. Returns parsed
     JSON, or bytes when `raw` is true."""
     headers = dict(headers or {})
@@ -39,7 +40,7 @@ def request(method, url, body=None, headers=None, raw=False):
     for attempt in range(len(waits) + 1):
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
                 payload = resp.read()
             break
         except urllib.error.HTTPError as e:
@@ -50,6 +51,8 @@ def request(method, url, body=None, headers=None, raw=False):
             raise GatewayError(f"{method} {url} -> {e.code}", e.code, detail) from None
         except urllib.error.URLError as e:
             raise GatewayError(f"{method} {url} failed: {e.reason}") from None
+        except (TimeoutError, socket.timeout):
+            raise GatewayError(f"{method} {url} timed out") from None
     if raw:
         return payload
     return json.loads(payload) if payload else {}

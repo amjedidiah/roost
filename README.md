@@ -39,14 +39,14 @@ flowchart LR
 - **Finding what's due** ([`due.py`](due.py)): a line counts when it has a date *and* a deadline word (due, by, before, until, expires, renews, pay, book, cancel, notice, ends, submit, return, appointment, check-up, departs, …). To-dos under a "To do" / "Next steps" / "Follow-ups" heading win over plain lines. Each item gets the next upcoming date it names, how many days away that is, urgency (≤ 7 days urgent, ≤ 30 soon, later can wait) and a next step (Do it now, Chase it up for call/chase/confirm lines, Plan it in). Overdue items stay listed for 14 days.
 - **Forward a bill** ([`inbox.py`](inbox.py)): email sent to `roost-nest@agentmail.to` from your sign-in address becomes a `.txt` document the next time roost checks (**Check for changes**, or the daily run). Only the text is read: the AgentMail connector doesn't forward attachment downloads, so attachments are reported back as "upload this instead". Mail from unknown addresses is ignored.
 - **Reminders** ([`digest.py`](digest.py), [`.github/workflows/daily.yml`](.github/workflows/daily.yml)): Sprites have no cron, so a GitHub Actions schedule calls `POST /internal/sync-all` (read forwarded mail, re-read Box) then `POST /internal/digest` (one email per user per day, only when something is due within 7 days). Email has a daily budget: 88 for users and 10 for tests, under AgentMail's free 100.
-- **Asking** ([`ask.py`](ask.py), [`decide.py`](decide.py)): the question is embedded, the closest chunks found in your namespace, and if the best match scores ≥ 0.28 the whole file is read back and a fixed rules engine picks the file, category, the best-matching to-do, its date, priority and next action. Below the threshold roost says it found nothing rather than guess.
+- **Asking** ([`ask.py`](ask.py), [`rerank.py`](rerank.py), [`decide.py`](decide.py)): the question is embedded and the 8 closest chunks found in your namespace. Pinecone's `bge-reranker-v2-m3` (through the connector, keyless) then re-scores them for how well each answers the question. It's answered when the reranker is sure (≥ 0.10), or when similarity passes 0.28 and the reranker doesn't reject it (≥ 0.002). Below that roost says it found nothing rather than guess. The whole best file is then read back and a fixed rules engine picks the file, category, the best-matching to-do, its date, priority and next action. The reranker has a monthly allowance (Starter: 500); roost counts its use (430 for users, 20 for tests) and falls back to similarity alone when it's spent or fails. Each answer says which was used (`ranked_by`).
 
 ## Connectors used
 
 | Connector | Used for |
 | --- | --- |
 | **Box** | per-user folders, upload, download, replace content (`/2.0/folders`, `/2.0/files/<id>/content`, `upload/files/content`) |
-| **Pinecone** | hosted embeddings (`/embed`) and the vectors API on the `roost-nest` index, one namespace per user |
+| **Pinecone** | hosted embeddings (`/embed`), reranking (`/rerank`), and the vectors API on the `roost-nest` index, one namespace per user |
 | **AgentMail** | sign-in codes and reminder emails (`/messages/send`), and reading forwarded bills (list and get messages) |
 
 Connection URLs are discovered at runtime from `https://api.sprites.dev/v1/gateway/list`, so none are hard-coded.
@@ -54,7 +54,7 @@ Connection URLs are discovered at runtime from `https://api.sprites.dev/v1/gatew
 ## What we learned about Sprites connectors (Nov 2026)
 
 - **Box:** list, download, folder create, upload and replace content are forwarded; **rename and delete are not** (403). Removing a file means emptying it.
-- **Pinecone:** inference and the vectors API are forwarded, but **not index creation or the 2026-07 documents API**. Console-made indexes now get a document schema only that API can read, so roost uses a plain dense index created through the API ([`scripts/create-index.sh`](scripts/create-index.sh)).
+- **Pinecone:** inference (`/embed`, `/rerank`) and the vectors API are forwarded, but **not index creation or the 2026-07 documents API**. Console-made indexes now get a document schema only that API can read, so roost uses a plain dense index created through the API ([`scripts/create-index.sh`](scripts/create-index.sh)).
 - **AgentMail:** send, list messages, get message and get thread are forwarded; **attachment downloads are not** ("endpoint is not supported by the AgentMail connector").
 - **The gateway sometimes answers 503.** roost retries GETs twice.
 - **A running service keeps a Sprite awake**, and a stopped one did not auto-start on request for us, so roost runs as an always-on service. There is no cron: the schedule lives in GitHub Actions.
@@ -89,7 +89,7 @@ After changing the code: `./scripts/deploy.sh` (or `./scripts/deploy.sh api` to 
 python3 -m unittest discover -s tests -t .
 ```
 
-79 tests, no network: Box, Pinecone, AgentMail and the inbox are faked ([`tests/fakes.py`](tests/fakes.py)). They cover sign-in (codes, links, expiry, lockout, rate limits, the user cap, test sign-ins), sessions and CSRF, per-user isolation, upload limits and names, deadline extraction from the sample documents, Word and PDF-style text, forwarded email, the digest and email budgets, account deletion, and the HTTP API end to end.
+88 tests, no network: Box, Pinecone, AgentMail and the inbox are faked ([`tests/fakes.py`](tests/fakes.py)). They cover sign-in (codes, links, expiry, lockout, rate limits, the user cap, test sign-ins), sessions and CSRF, per-user isolation, upload limits and names, deadline extraction from the sample documents, Word and PDF-style text, forwarded email, reranking with its budget and fallback, the digest and email budgets, account deletion, and the HTTP API end to end.
 
 ## Layout
 

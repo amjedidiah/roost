@@ -19,18 +19,20 @@ EMBED_BATCH = 96  # max inputs per /embed request for this model
 UPSERT_BATCH = 100
 DELETE_BATCH = 1000
 FETCH_BATCH = 100
+RERANK_TIMEOUT = 10  # seconds; slower than this and ask falls back to similarity
 
 
 class Nest:
     def __init__(self, namespace=None):
         self.namespace = namespace or NAMESPACE
 
-    def _post(self, path, body):
+    def _post(self, path, body, timeout=gateway.TIMEOUT):
         return gateway.request(
             "POST",
             gateway.base_url("pinecone") + path,
             body,
             {"X-Pinecone-API-Version": API_VERSION},
+            timeout=timeout,
         )
 
     def embed(self, texts, input_type):
@@ -44,6 +46,17 @@ class Nest:
             })
             vectors.extend(d["values"] for d in resp["data"])
         return vectors
+
+    def rerank(self, query, texts, model):
+        """Relevance score (0-1) of each text to the query, in the order given."""
+        resp = self._post("/rerank", {
+            "model": model, "query": query, "top_n": len(texts), "return_documents": False,
+            "parameters": {"truncate": "END"}, "documents": [{"text": t} for t in texts],
+        }, timeout=RERANK_TIMEOUT)
+        out = [0.0] * len(texts)
+        for row in resp["data"]:
+            out[row["index"]] = row["score"]
+        return out
 
     def upsert(self, records):
         """records: [{"id", "values", "metadata"}]."""

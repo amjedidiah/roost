@@ -122,6 +122,7 @@ class Smoke:
         self.check("upload", "smoke-bills.md" in names, (status, body))
         status, body = call("GET", "/api/ask?q=" + urllib.parse.quote("when do I pay the electricity bill"))
         self.check("ask finds the upload", status == 200 and body.get("source_file") == "smoke-bills.md", (status, body))
+        self.check("ask used the reranker", body.get("ranked_by") == "rerank", body.get("ranked_by"))
         due_day = dt.date.today() + dt.timedelta(days=10)
         bill = f"Water bill {time.strftime('%H%M%S')}"  # unique per run
         send(INBOX, f"roost-smoke: Fwd: {bill}",

@@ -15,6 +15,8 @@ from pathlib import Path
 import accounts
 import digest
 import inbox
+import rerank
+from ask import ask as ask_question
 import userspace
 from due import extract_items, upcoming
 from extract import ExtractError, text_from
@@ -370,6 +372,85 @@ class InboxTest(TempData):
 def read_done():
     from store import read_json
     return read_json(inbox._state_path(), {"done": []})["done"]
+
+
+class RerankNest:
+    """Search returns preset matches; the reranker returns preset scores or fails."""
+
+    def __init__(self, matches, relevance=None, error=None):
+        self.matches, self.relevance, self.error, self.reranked = matches, relevance, error, 0
+
+    def embed(self, texts, input_type):
+        return [[1.0] for _ in texts]
+
+    def query(self, vector, top_k=8):
+        return [dict(m) for m in self.matches]
+
+    def rerank(self, query, texts, model):
+        self.reranked += 1
+        if self.error:
+            raise self.error
+        assert all(t.startswith("Document: ") for t in texts)  # sent with the document name
+        return self.relevance
+
+    def fetch(self, ids):
+        return {}
+
+
+def match(file, score, text):
+    return {"score": score, "metadata": {"file_id": file, "file_name": f"{file}.md", "chunk_index": 0, "chunk_text": text}}
+
+
+class RerankTest(TempData):
+    def setUp(self):
+        super().setUp()
+        self.hist = Path(self.tmp.name) / "h"
+        self.state = Path(self.tmp.name) / "nest.json"
+        self.matches = [match("lease", 0.33, "Rent is due monthly."), match("gym", 0.30, "Membership renews by 1 March 2027.")]
+
+    def ask(self, nest, kind="user", q="when is my gym membership due"):
+        return ask_question(q, nest, self.state, self.hist, NOW, kind=kind)
+
+    def test_rerank_reorders_and_decides(self):
+        d = self.ask(RerankNest(self.matches, [0.01, 0.6]))
+        self.assertEqual((d["ranked_by"], d["answered"], d["source_file"]), ("rerank", True, "gym.md"))
+        self.assertEqual(d["matches"][0], {"file": "gym.md", "chunk": 0, "score": 0.6, "similarity": 0.3})
+
+    def test_rerank_rejects_a_similarity_false_positive(self):
+        d = self.ask(RerankNest(self.matches, [0.0002, 0.0001]))
+        self.assertEqual((d["ranked_by"], d["answered"]), ("rerank", False))
+
+    def test_broad_question_passes_on_similarity_when_rerank_does_not_reject(self):
+        self.assertTrue(rerank.answered(0.004, 0.36, 0.28))
+        self.assertFalse(rerank.answered(0.004, 0.25, 0.28))
+        self.assertTrue(rerank.answered(0.5, 0.1, 0.28))
+        self.assertFalse(rerank.answered(0.001, 0.4, 0.28))
+
+    def test_failure_falls_back_to_similarity(self):
+        import gateway
+        d = self.ask(RerankNest(self.matches, error=gateway.GatewayError("x", 429)))
+        self.assertEqual((d["ranked_by"], d["answered"], d["source_file"]), ("similarity", True, "lease.md"))
+
+    def test_budget_per_kind_then_fallback(self):
+        old = dict(rerank.BUDGETS)
+        rerank.BUDGETS.update({"user": 2, "test": 1})
+        try:
+            nest = RerankNest(self.matches, [0.01, 0.6])
+            self.assertEqual([self.ask(nest)["ranked_by"] for _ in range(3)], ["rerank", "rerank", "similarity"])
+            self.assertEqual(nest.reranked, 2)  # no request once the budget is spent
+            self.assertEqual(self.ask(nest, kind="test")["ranked_by"], "rerank")  # tests have their own
+            self.assertEqual(self.ask(nest, kind="test")["ranked_by"], "similarity")
+            self.assertEqual((rerank.used("2026-11"), rerank.used("2026-11", "test")), (2, 1))
+        finally:
+            rerank.BUDGETS.clear(); rerank.BUDGETS.update(old)
+
+    def test_test_accounts_use_the_test_budget(self):
+        _, code = accounts.start_signin("roost-nest@agentmail.to", NOW, test=True)
+        tester = accounts.verify_code("roost-nest@agentmail.to", code, NOW)
+        nest = RerankNest(self.matches, [0.01, 0.6])
+        userspace.ask(tester, "when is my gym membership due", lambda ns: nest)
+        month = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m")
+        self.assertEqual((rerank.used(month, "test"), rerank.used(month)), (1, 0))
 
 
 class MailBudgetTest(TempData):

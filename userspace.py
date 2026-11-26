@@ -198,4 +198,5 @@ def due(uid, today=None, within_days=60):
 
 
 def ask(uid, question, make_nest):
-    return ask_question(question, make_nest(namespace(uid)), state_path(uid), user_dir(uid) / "history")
+    kind = "test" if (accounts.get_user(uid) or {}).get("test") else "user"
+    return ask_question(question, make_nest(namespace(uid)), state_path(uid), user_dir(uid) / "history", kind=kind)

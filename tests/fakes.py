@@ -77,6 +77,17 @@ class FakeNest:
     def clear(self):
         self.vectors.clear()
 
+    rerank_calls = 0
+    rerank_error = None  # set to an exception to make rerank fail
+
+    def rerank(self, query, texts, model):
+        """Share of the query's words found in each text, as a stand-in relevance score."""
+        FakeNest.rerank_calls += 1
+        if FakeNest.rerank_error:
+            raise FakeNest.rerank_error
+        words = {w for w in query.lower().split() if len(w) > 3}
+        return [len(words & set(t.lower().split())) / max(1, len(words)) for t in texts]
+
     def query(self, vector, top_k=5):
         return []
 

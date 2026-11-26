@@ -158,19 +158,25 @@ def _fmt(d):
 
 # --- decision ------------------------------------------------------------------
 
-def decide(question, matches, doc_chunks, today):
-    """matches: Pinecone matches ({score, metadata}) best first. doc_chunks: the
-    full chunk texts of the best-matching file, in order (may be empty)."""
+def decide(question, matches, doc_chunks, today, answered=None, ranked_by="similarity"):
+    """matches: Pinecone matches ({score, metadata}) best first; with ranked_by
+    "rerank", score is the reranker's and each match also has "similarity".
+    doc_chunks: the full chunk texts of the best-matching file, in order (may be
+    empty). answered: ask's verdict; None means the similarity cut-off decides."""
     top = matches[0] if matches else None
     confidence = round(top["score"], 3) if top else 0.0
     listed = [{"file": m["metadata"].get("file_name"), "chunk": int(m["metadata"].get("chunk_index", 0)),
-               "score": round(m["score"], 3)} for m in matches[:5]]
+               "score": round(m["score"], 3),
+               **({"similarity": round(m["similarity"], 3)} if "similarity" in m else {})} for m in matches[:5]]
+    if answered is None:
+        answered = bool(top) and top["score"] >= ANSWER_THRESHOLD
 
-    if not top or top["score"] < ANSWER_THRESHOLD:
+    if not answered:
         return {
             "question": question, "answered": False, "source_file": None, "category": "other",
             "priority": "low", "next_action": "none", "due": None, "action_item": None,
             "action_from": None, "confidence": confidence, "evidence": None, "matches": listed,
+            "ranked_by": ranked_by,
             "summary": f"Nothing in the nest matches this closely enough (best score {confidence}).",
         }
 
@@ -216,4 +222,5 @@ def decide(question, matches, doc_chunks, today):
         "action_item": item, "action_from": action_heading(chunks, raw_item) if raw_item else None,
         "confidence": confidence,
         "evidence": _plain(meta.get("chunk_text", ""))[:400], "matches": listed, "summary": summary,
+        "ranked_by": ranked_by,
     }
