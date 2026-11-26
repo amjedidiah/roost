@@ -103,6 +103,16 @@ def action_items(chunks):
     return items
 
 
+def action_heading(chunks, item):
+    """The heading of the to-do list `item` was quoted from, e.g. 'To do'."""
+    for chunk in chunks:
+        heading, _, body = chunk.partition("\n")
+        if ACTION_HEADING.search(heading) and any(
+                (m := BULLET.match(line)) and m.group(1).strip() == item for line in body.splitlines()):
+            return heading.strip()
+    return None
+
+
 def _words(text):
     return {w for w in WORD.findall(text.lower()) if w not in STOPWORDS}
 
@@ -160,7 +170,7 @@ def decide(question, matches, doc_chunks, today):
         return {
             "question": question, "answered": False, "source_file": None, "category": "other",
             "priority": "low", "next_action": "none", "due": None, "action_item": None,
-            "confidence": confidence, "evidence": None, "matches": listed,
+            "action_from": None, "confidence": confidence, "evidence": None, "matches": listed,
             "summary": f"Nothing in the nest matches this closely enough (best score {confidence}).",
         }
 
@@ -203,6 +213,7 @@ def decide(question, matches, doc_chunks, today):
     return {
         "question": question, "answered": True, "source_file": source, "category": category,
         "priority": priority, "next_action": next_action, "due": due.isoformat() if due else None,
-        "action_item": item, "confidence": confidence,
+        "action_item": item, "action_from": action_heading(chunks, raw_item) if raw_item else None,
+        "confidence": confidence,
         "evidence": _plain(meta.get("chunk_text", ""))[:400], "matches": listed, "summary": summary,
     }

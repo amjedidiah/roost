@@ -5,13 +5,16 @@ changes. Files removed from Box have their chunks deleted from the nest. State
 is saved after every file, so a crash mid-run loses at most one file's work.
 """
 
+import datetime as dt
 import json
 import os
 import re
 from pathlib import Path
 
+from due import extract_items
+from extract import ExtractError, supported_extensions, text_from
+
 BOX_FOLDER = os.environ.get("ROOST_BOX_FOLDER", "roost")
-TEXT_EXTENSIONS = {"md", "markdown", "txt"}
 MAX_CHUNK = 1200  # characters; well under the embedding model's token limit
 STATE_VERSION = 1
 
@@ -105,13 +108,17 @@ def chunk_ids(file_id, start, stop):
     return [f"{file_id}#{i}" for i in range(start, stop)]
 
 
-def ingest(box, nest, state_path=None):
+def ingest(box, nest, state_path=None, folder_id=None, today=None):
+    """Sync one Box folder into one Pinecone namespace (the `nest`), tracked in `state_path`.
+    With no folder_id, the folder named ROOST_BOX_FOLDER in the Box root is used."""
     state_path = state_path or data_dir() / "nest.json"
+    today = today or dt.datetime.now(dt.timezone.utc).date()
     state = load_state(state_path)
+    supported = supported_extensions()
     summary = {"added": [], "updated": [], "unchanged": 0, "removed": [], "skipped": [],
                "chunks_upserted": 0, "chunks_deleted": 0}
 
-    folder_id = state["box_folder_id"] or box.find_folder(BOX_FOLDER)
+    folder_id = folder_id or state["box_folder_id"] or box.find_folder(BOX_FOLDER)
     if not folder_id:
         raise LookupError(f"no Box folder named '{BOX_FOLDER}' in the root folder")
     state["box_folder_id"] = folder_id
@@ -124,18 +131,23 @@ def ingest(box, nest, state_path=None):
         ext = (item.get("extension") or "").lower()
         if name.startswith("."):
             continue  # .DS_Store and friends
-        if ext not in TEXT_EXTENSIONS:
+        if ext not in supported:
             summary["skipped"].append({"name": name, "reason": f"unsupported type .{ext or '?'}"})
             continue
 
         file_id = item["id"]
         seen.add(file_id)
         prev = state["files"].get(file_id)
-        if prev and prev["sha1"] == item.get("sha1") and prev["name"] == name:
+        if prev and prev["sha1"] == item.get("sha1") and prev["name"] == name and "due" in prev:
             summary["unchanged"] += 1
             continue
 
-        text = box.download(file_id).decode("utf-8", "replace")
+        try:
+            text = text_from(name, box.download(file_id))
+        except ExtractError as e:
+            summary["skipped"].append({"name": name, "reason": str(e)})
+            seen.discard(file_id)
+            continue
         chunks = chunk_text(text)
         if not chunks:
             summary["skipped"].append({"name": name, "reason": "no text"})
@@ -158,7 +170,8 @@ def ingest(box, nest, state_path=None):
             summary["chunks_deleted"] += len(stale)
 
         state["files"][file_id] = {"name": name, "sha1": item.get("sha1"), "chunks": len(chunks),
-                                   "modified_at": item.get("modified_at", "")}
+                                   "modified_at": item.get("modified_at", ""), "size": item.get("size", 0),
+                                   "due": extract_items(chunks, today)}
         summary["updated" if prev else "added"].append(name)
         save_state(state_path, state)
 

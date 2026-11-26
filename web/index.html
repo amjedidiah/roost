@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>roost: never miss what your documents say is due</title>
+<meta name="description" content="Add your bills, bookings and letters. roost finds every deadline in them and emails you before each one.">
+<meta name="theme-color" content="#111111">
+<link rel="preload" href="/assets/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111111'/%3E%3Crect x='6' y='18' width='20' height='6' rx='1' fill='%23ffd60a'/%3E%3C/svg%3E">
+<style>
+@font-face {
+  font-family: "Schibsted Grotesk";
+  src: url("/assets/schibsted-grotesk.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root {
+  --night: #111111;
+  --card: #1b1b1b;
+  --raised: #262626;
+  --line: #333333;
+  --text: #f4f4f2;
+  --muted: #a6a6a6;
+  --signal: #ffd60a;
+  --danger: #ff8a7a;
+  --face: "Schibsted Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+  --r-sm: 10px; --r-md: 14px; --r-lg: 20px;
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scrollbar-color: var(--line) var(--night); scrollbar-width: thin; }
+
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--text);
+  font: 400 16px/1.5 var(--face);
+  caret-color: var(--signal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: var(--text); color: var(--night); }
+a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+
+.wrap { width: min(100% - 40px, 680px); margin-inline: auto; }
+
+/* ---------- shared controls ---------- */
+
+.btn {
+  min-height: 52px;
+  padding: 0 var(--s5);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--text);
+  color: var(--night);
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color .2s var(--ease), transform .2s var(--ease);
+}
+.btn:hover { background: #ffffff; }
+.btn:active { transform: scale(.98); }
+.btn:disabled { background: var(--raised); color: var(--muted); cursor: default; transform: none; }
+
+.pill {
+  min-height: 40px;
+  padding: 0 var(--s4);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: background-color .2s var(--ease), border-color .2s var(--ease);
+}
+.pill:hover { background: var(--card); border-color: var(--muted); }
+.pill:disabled { color: var(--muted); cursor: default; background: transparent; border-color: var(--line); }
+
+.link {
+  padding: var(--s3) 0;
+  margin: calc(var(--s3) * -1) 0;
+  border: 0;
+  background: none;
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.link.quiet { color: var(--muted); }
+.link.quiet:hover { color: var(--text); }
+
+.field {
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  padding: 0 var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--night);
+  font-size: 17px;
+}
+.field::placeholder { color: var(--muted); opacity: 1; }
+.field:focus-visible { outline: none; border-color: var(--text); }
+
+.card { padding: var(--s5); border-radius: var(--r-lg); background: var(--card); }
+.muted { color: var(--muted); }
+.note { margin: var(--s3) 0 0; font-size: 15px; }
+.note:empty { display: none; }
+.note.bad { color: var(--danger); }
+
+/* ---------- top bar ---------- */
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); padding-block: var(--s5); }
+.mark { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; text-decoration: none; }
+.who { display: flex; align-items: center; gap: var(--s3); min-width: 0; font-size: 14px; }
+.who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+
+/* ---------- signed out ---------- */
+
+.hero { padding-top: var(--s7); }
+
+h1 {
+  margin: 0;
+  font-size: clamp(38px, 10vw, 60px);
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.lede { margin: var(--s4) 0 0; max-width: 32em; font-size: 18px; line-height: 1.45; color: var(--muted); }
+
+.steps { display: grid; gap: var(--s3); margin: var(--s7) 0 0; padding: 0; list-style: none; counter-reset: step; }
+.steps li { display: flex; gap: var(--s4); align-items: baseline; padding: var(--s4) var(--s5); border-radius: var(--r-md); background: var(--card); counter-increment: step; }
+.steps li::before { content: counter(step); flex: none; width: 1.5em; font-weight: 700; color: var(--muted); }
+.steps b { font-weight: 700; }
+.steps span { color: var(--muted); }
+
+.signin { margin-top: var(--s6); }
+.signin h2 { margin: 0; font-size: 20px; }
+.signin p { margin: var(--s1) 0 var(--s4); color: var(--muted); font-size: 15px; }
+.row { display: flex; gap: var(--s2); }
+.row .field { flex: 1; }
+.code { font-family: var(--mono); letter-spacing: .3em; font-size: 20px; }
+.again { display: flex; flex-wrap: wrap; gap: var(--s5); margin-top: var(--s4); }
+
+.demo-note { margin: var(--s5) 0 0; padding: var(--s4) var(--s5); border: 1px solid var(--line); border-radius: var(--r-md); font-size: 14px; color: var(--muted); }
+.demo-note b { color: var(--text); }
+
+/* ---------- signed in ---------- */
+
+.section { margin-top: var(--s7); }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); margin-bottom: var(--s4); }
+.section-head h2 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+.section-head .meta { font-size: 14px; color: var(--muted); }
+
+.group-title { margin: var(--s5) 0 var(--s2); font-size: 14px; font-weight: 400; color: var(--muted); }
+.group-title:first-child { margin-top: 0; }
+
+.items { display: grid; gap: var(--s2); margin: 0; padding: 0; list-style: none; }
+
+.item {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--s4);
+  align-items: start;
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+
+.date {
+  display: grid;
+  justify-items: center;
+  padding: var(--s2) 0;
+  border-radius: var(--r-sm);
+  background: var(--raised);
+  line-height: 1.1;
+}
+.date b { font-size: 24px; letter-spacing: -0.02em; }
+.date span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.item.overdue .date { outline: 1px solid var(--danger); outline-offset: -1px; }
+
+.what { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.35; }
+.what mark {
+  color: var(--night);
+  background-image: linear-gradient(var(--signal), var(--signal));
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: .03em .18em;
+  border-radius: 4px;
+}
+.tags { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); margin-top: var(--s2); font-size: 14px; color: var(--muted); }
+.tags .urgent { color: var(--text); }
+.tags .late { color: var(--danger); }
+.tag-urgency { display: inline-flex; align-items: center; gap: 6px; }
+
+.empty { display: grid; gap: var(--s3); justify-items: start; }
+.empty h3 { margin: 0; font-size: 20px; }
+.empty p { margin: 0; color: var(--muted); }
+.empty .row { flex-wrap: wrap; }
+
+.usage { font-size: 14px; color: var(--muted); }
+.bar { height: 6px; margin-top: var(--s2); border-radius: 999px; background: var(--raised); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--text); border-radius: 999px; transition: width .4s var(--ease); }
+
+.drop {
+  display: grid;
+  justify-items: center;
+  gap: var(--s2);
+  margin-top: var(--s4);
+  padding: var(--s6) var(--s5);
+  border: 1px dashed var(--line);
+  border-radius: var(--r-lg);
+  text-align: center;
+  transition: border-color .2s var(--ease), background-color .2s var(--ease);
+}
+.drop.over { border-color: var(--text); background: var(--card); }
+.drop p { margin: 0; font-size: 14px; color: var(--muted); }
+
+.docs { display: grid; gap: var(--s2); margin: var(--s4) 0 0; padding: 0; list-style: none; }
+.doc { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--card); }
+.doc-name { min-width: 0; }
+.doc-name b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.doc-name span { font-size: 14px; color: var(--muted); }
+.doc-actions { display: flex; align-items: center; gap: var(--s3); flex: none; font-size: 14px; }
+.danger { color: var(--danger); }
+
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
+.toggle b { display: block; }
+.toggle span { font-size: 14px; color: var(--muted); }
+.switch {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--raised);
+  transition: background-color .2s var(--ease);
+}
+.switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--muted); transition: transform .25s var(--ease), background-color .2s var(--ease); }
+.switch[aria-checked="true"] { background: var(--text); }
+.switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--night); }
+.reminder-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); margin-top: var(--s4); }
+.account p { margin: var(--s1) 0 0; font-size: 14px; color: var(--muted); }
+.pill.danger { color: var(--danger); }
+.pill.danger:hover { border-color: var(--danger); }
+
+.ask { display: flex; align-items: flex-end; gap: var(--s2); padding: var(--s2) var(--s2) var(--s2) var(--s5); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card); }
+.ask:focus-within { border-color: var(--muted); }
+.ask textarea { flex: 1; min-width: 0; align-self: center; padding: var(--s3) 0; border: 0; background: transparent; font-size: 18px; line-height: 1.35; resize: none; overflow: hidden; field-sizing: content; min-height: calc(1.35em + 24px); }
+.ask textarea::placeholder { color: var(--muted); opacity: 1; }
+.ask textarea:focus-visible { outline: none; }
+
+.answer { margin-top: var(--s4); }
+.answer .from { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s1) var(--s4); font-size: 14px; color: var(--muted); }
+.answer .from b { color: var(--text); }
+.answer .label { margin: var(--s4) 0 var(--s2); font-size: 14px; color: var(--muted); }
+.answer .todo { margin: 0; font-size: clamp(20px, 5vw, 24px); font-weight: 700; line-height: 1.35; }
+.answer .todo mark { color: var(--night); background: var(--signal); padding: .03em .18em; border-radius: 4px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); margin: var(--s4) 0 0; }
+.fact { margin: 0; padding: var(--s3) var(--s4); border-radius: var(--r-sm); background: var(--raised); }
+.fact dt { font-size: 13px; color: var(--muted); }
+.fact dd { margin: var(--s1) 0 0; font-weight: 700; }
+.fact dd small { display: block; font-weight: 400; font-size: 14px; color: var(--muted); }
+.quote { margin: var(--s4) 0 0; padding: var(--s4); border-radius: var(--r-sm); background: var(--night); font-size: 15px; line-height: 1.55; }
+.quote p { margin: 0; }
+.quote p + p { margin-top: var(--s2); }
+.quote .lead { font-weight: 700; }
+
+.foot { padding-block: var(--s8) var(--s7); font-size: 14px; color: var(--muted); }
+.foot p { margin: 0; max-width: 56ch; }
+.foot p + p { margin-top: var(--s2); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise { animation: rise .5s var(--ease) both; }
+  .rise mark { animation: sweep .7s var(--ease) .3s both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes sweep { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
+}
+
+@media (min-width: 640px) {
+  .facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .card { padding: var(--s6); }
+}
+
+@media (max-width: 480px) {
+  .row { flex-direction: column; }
+  .row .btn { width: 100%; }
+  .item { grid-template-columns: 52px minmax(0, 1fr); gap: var(--s3); }
+  .date b { font-size: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <a class="mark" href="/">roost</a>
+    <div class="who" id="who" hidden>
+      <span id="whoEmail"></span>
+      <button class="pill" id="signOut" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <!-- ===================== signed out ===================== -->
+  <main id="outView" hidden>
+    <section class="hero">
+      <h1>Never miss what your documents say is due.</h1>
+      <p class="lede">Add your bills, bookings and letters. roost finds every deadline written in them and emails you before each one.</p>
+    </section>
+
+    <ol class="steps" aria-label="How roost works">
+      <li><div><b>Add your documents.</b> <span>Word or text files, or try the sample ones.</span></div></li>
+      <li><div><b>roost finds the dates.</b> <span>Only what is written in your files, never guessed.</span></div></li>
+      <li><div><b>Get a reminder.</b> <span>A short email the week something is due.</span></div></li>
+    </ol>
+
+    <section class="card signin" aria-labelledby="signinTitle">
+      <form id="emailForm">
+        <h2 id="signinTitle">Sign in with your email</h2>
+        <p>No password. We'll email you a 6-digit code.</p>
+        <div class="row">
+          <input class="field" id="email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required aria-label="Your email address">
+          <button class="btn" id="emailBtn" type="submit">Email me a code</button>
+        </div>
+      </form>
+      <form id="codeForm" hidden>
+        <h2>Check your email</h2>
+        <p id="codeHint"></p>
+        <div class="row">
+          <input class="field code" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456" required aria-label="6-digit code">
+          <button class="btn" id="codeBtn" type="submit">Sign in</button>
+        </div>
+        <div class="again">
+          <button class="link quiet" id="resend" type="button">Send a new code</button>
+          <button class="link quiet" id="otherEmail" type="button">Use a different email</button>
+        </div>
+      </form>
+      <p class="note" id="signinNote" role="status" aria-live="polite"></p>
+    </section>
+
+    <p class="demo-note"><b>This is a hackathon demo.</b> Files you add are stored in the roost owner's Box account, so don't add anything sensitive. Everything is deleted after 1 December 2026.</p>
+  </main>
+
+  <!-- ===================== signed in ===================== -->
+  <main id="inView" hidden>
+    <section class="section" aria-labelledby="dueTitle" style="margin-top: var(--s5)">
+      <div class="section-head">
+        <h2 id="dueTitle">Coming up</h2>
+        <span class="meta" id="dueMeta"></span>
+      </div>
+      <div id="due"></div>
+    </section>
+
+    <section class="section" aria-labelledby="docsTitle">
+      <div class="section-head">
+        <h2 id="docsTitle">Your documents</h2>
+        <button class="pill" id="syncBtn" type="button">Check for changes</button>
+      </div>
+      <div class="usage" id="usage"></div>
+      <div class="bar" aria-hidden="true"><i id="usageBar" style="width:0"></i></div>
+      <div class="drop" id="drop">
+        <button class="btn" id="addBtn" type="button">Add a document</button>
+        <p id="dropHint">or drop a file here</p>
+        <input id="file" type="file" hidden>
+      </div>
+      <p class="note" id="docsNote" role="status" aria-live="polite"></p>
+      <ul class="docs" id="docs"></ul>
+    </section>
+
+    <section class="section" aria-labelledby="remTitle">
+      <div class="section-head"><h2 id="remTitle">Reminders</h2></div>
+      <div class="card">
+        <div class="toggle">
+          <div><b>Email me what's due</b><span id="remTo"></span></div>
+          <button class="switch" id="remSwitch" type="button" role="switch" aria-checked="false" aria-label="Email reminders"></button>
+        </div>
+        <div class="reminder-actions">
+          <button class="pill" id="testBtn" type="button">Send me one now</button>
+        </div>
+        <p class="note" id="remNote" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="askTitle">
+      <div class="section-head"><h2 id="askTitle">Ask about your documents</h2></div>
+      <form class="ask" id="askForm" role="search">
+        <textarea id="q" rows="1" placeholder="When does my car insurance renew?" aria-label="Your question" maxlength="500" enterkeyhint="go"></textarea>
+        <button class="btn" id="askBtn" type="submit">Ask</button>
+      </form>
+      <p class="note" id="askNote" role="status" aria-live="polite"></p>
+      <div id="answer"></div>
+    </section>
+
+    <section class="section" aria-labelledby="accTitle">
+      <div class="section-head"><h2 id="accTitle">Your account</h2></div>
+      <div class="card account">
+        <b>Delete my account</b>
+        <p>Removes your account and empties every document you added. You can't undo this.</p>
+        <div class="reminder-actions" id="delActions"></div>
+        <p class="note" id="delNote" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>roost runs on a Fly.io Sprite. It reads your files from Box, remembers them in Pinecone and sends email through AgentMail, all through Sprites connectors, so the server holds no passwords or keys. Dates come from fixed rules over your own words, not an AI chatbot.</p>
+    <p>Built for Hacksgiving 2026. <a href="https://github.com/amjedidiah/roost">Source on GitHub</a></p>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const NEXT = { act_now: "Do it now", follow_up: "Chase it up", schedule: "Plan it in", review: "Just read it", none: "Nothing" };
+  const URGENCY = { high: "Urgent", medium: "Soon", low: "Can wait" };
+  const TYPE = { home: "Home", finance: "Money", health: "Health", travel: "Travel", purchases: "Things you bought", personal: "Personal", work: "Work", other: "Other" };
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const $ = (id) => document.getElementById(id);
+
+  let me = null;
+  let docs = [];
+
+  // ---------- helpers ----------
+
+  function el(tag, props, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props || {})) {
+      if (value == null || value === false) continue;
+      if (key === "class") node.className = value;
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else node.setAttribute(key, value === true ? "" : value);
+    }
+    for (const child of children.flat()) {
+      if (child == null || child === false) continue;
+      node.append(child.nodeType ? child : document.createTextNode(String(child)));
+    }
+    return node;
+  }
+
+  function mark(level) {
+    const svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("width", "11"); svg.setAttribute("height", "11"); svg.setAttribute("viewBox", "0 0 12 12"); svg.setAttribute("aria-hidden", "true");
+    const add = (a) => { const r = document.createElementNS(SVGNS, "rect"); for (const [k, v] of Object.entries(a)) r.setAttribute(k, v); svg.append(r); };
+    add({ x: ".75", y: ".75", width: "10.5", height: "10.5", rx: "2", fill: "none", stroke: "currentColor", "stroke-width": "1.5" });
+    if (level === "high") add({ x: "0", y: "0", width: "12", height: "12", rx: "2", fill: "currentColor" });
+    if (level === "medium") add({ x: "0", y: "6", width: "12", height: "6", rx: "1", fill: "currentColor" });
+    return svg;
+  }
+
+  const parseDay = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
+  const when = (days) => days === 0 ? "today" : days === 1 ? "tomorrow" : days > 1 ? `in ${days} days` : days === -1 ? "yesterday" : `${-days} days ago`;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const mb = (bytes) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
+
+  function say(id, text, bad) {
+    const node = $(id);
+    node.textContent = text || "";
+    node.classList.toggle("bad", Boolean(bad));
+  }
+
+  async function api(method, path, body, extraHeaders) {
+    const headers = { ...(extraHeaders || {}) };
+    if (method !== "GET") headers["X-Requested-With"] = "roost";
+    let payload = body;
+    if (body && !(body instanceof Blob) && !(body instanceof ArrayBuffer)) {
+      headers["Content-Type"] = "application/json";
+      payload = JSON.stringify(body);
+    }
+    let res;
+    try {
+      res = await fetch(path, { method, headers, body: payload, credentials: "same-origin", cache: "no-store" });
+    } catch {
+      throw Object.assign(new Error("Can't reach roost. Check your internet connection and try again."), { status: 0 });
+    }
+    let data = null;
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      if (res.status === 401 && me) { me = null; render(); }
+      throw Object.assign(new Error((data && data.error) || `Something went wrong (${res.status}).`), { status: res.status });
+    }
+    return data;
+  }
+
+  function busy(button, text) {
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = text;
+    return () => { button.disabled = false; button.textContent = label; };
+  }
+
+  // ---------- sign in ----------
+
+  let pendingEmail = "";
+
+  async function sendCode(email) {
+    const done = busy($("emailBtn"), "Sending…");
+    say("signinNote", "");
+    try {
+      await api("POST", "/api/auth/start", { email });
+      pendingEmail = email.trim().toLowerCase();
+      $("codeHint").textContent = `We sent a 6-digit code to ${pendingEmail}. It can take a minute, and it may land in your spam folder.`;
+      $("emailForm").hidden = true;
+      $("codeForm").hidden = false;
+      $("code").value = "";
+      $("code").focus();
+    } catch (err) {
+      say("signinNote", err.message, true);
+    } finally {
+      done();
+    }
+  }
+
+  $("emailForm").addEventListener("submit", (e) => { e.preventDefault(); sendCode($("email").value); });
+  $("resend").addEventListener("click", () => sendCode(pendingEmail).then(() => say("signinNote", "A new code is on its way.")));
+  $("otherEmail").addEventListener("click", () => { $("codeForm").hidden = true; $("emailForm").hidden = false; say("signinNote", ""); $("email").focus(); });
+
+  $("codeForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const done = busy($("codeBtn"), "Signing in…");
+    say("signinNote", "");
+    try {
+      await api("POST", "/api/auth/verify", { email: pendingEmail, code: $("code").value });
+      await load();
+    } catch (err) {
+      say("signinNote", err.message, true);
+    } finally {
+      done();
+    }
+  });
+
+  $("signOut").addEventListener("click", async () => {
+    try { await api("POST", "/api/auth/signout"); } catch {}
+    me = null;
+    render();
+  });
+
+  // ---------- coming up ----------
+
+  function renderDue(items) {
+    const box = $("due");
+    if (!docs.length) {
+      box.replaceChildren(el("div", { class: "card empty" },
+        el("h3", null, "Nothing to watch yet"),
+        el("p", null, "Add a document and roost will list every deadline it finds. No documents to hand? Try the samples."),
+        el("div", { class: "row" },
+          el("button", { class: "btn", type: "button", onclick: () => $("file").click() }, "Add a document"),
+          el("button", { class: "pill", type: "button", onclick: addSamples, style: "min-height:52px" }, "Try sample documents"))));
+      $("dueMeta").textContent = "";
+      return;
+    }
+    if (!items.length) {
+      box.replaceChildren(el("div", { class: "card empty" },
+        el("h3", null, "No dates coming up"),
+        el("p", null, "roost didn't find a deadline in the next 60 days. It looks for lines that name a date and say things like “due”, “by”, “before” or “expires”.")));
+      $("dueMeta").textContent = "";
+      return;
+    }
+    const overdue = items.filter((i) => i.overdue);
+    const week = items.filter((i) => !i.overdue && i.days <= 7);
+    const later = items.filter((i) => !i.overdue && i.days > 7);
+    const firstUpcoming = (week[0] || later[0] || {}).line;
+    $("dueMeta").textContent = `${plural(items.length, "date")} in the next 60 days`;
+
+    const row = (i) => {
+      const d = parseDay(i.due);
+      const highlight = i.line === firstUpcoming && !i.overdue;
+      return el("li", { class: `item${i.overdue ? " overdue" : ""}` },
+        el("div", { class: "date", "aria-hidden": "true" }, el("span", null, MONTHS[d.getMonth()]), el("b", null, d.getDate()), el("span", null, DAYS[d.getDay()])),
+        el("div", null,
+          el("p", { class: "what" }, highlight ? el("mark", null, i.line) : i.line),
+          el("div", { class: "tags" },
+            el("span", { class: i.overdue ? "late" : i.urgency === "high" ? "urgent" : "" },
+              i.overdue ? `Overdue, was due ${when(i.days)}` : `Due ${when(i.days)}`),
+            el("span", { class: "tag-urgency" }, mark(i.overdue ? "high" : i.urgency), i.overdue ? "Urgent" : URGENCY[i.urgency]),
+            el("span", null, NEXT[i.next_action]),
+            el("span", null, `from ${i.file}`))));
+    };
+    const group = (title, list) => list.length ? [el("h3", { class: "group-title" }, title), el("ol", { class: "items" }, list.map(row))] : [];
+    box.replaceChildren(...group("Overdue", overdue), ...group("This week", week), ...group("Later", later));
+  }
+
+  async function refreshDue() {
+    try { renderDue((await api("GET", "/api/due?days=60")).items); }
+    catch (err) { $("due").replaceChildren(el("p", { class: "note bad" }, err.message)); }
+  }
+
+  // ---------- documents ----------
+
+  function renderDocs(list, usage) {
+    docs = list;
+    if (usage) {
+      me.usage = usage;
+      $("usage").textContent = `${usage.files} of ${usage.max_files} documents · ${mb(usage.bytes)} of ${mb(usage.max_bytes)}`;
+      $("usageBar").style.width = `${Math.min(100, Math.max(usage.files / usage.max_files, usage.bytes / usage.max_bytes) * 100)}%`;
+      $("dropHint").textContent = `or drop a file here · ${usage.types.map((t) => "." + t).join(", ")} · up to ${mb(usage.max_file_bytes)}`;
+      $("file").setAttribute("accept", usage.types.map((t) => "." + t).join(","));
+    }
+    $("docs").replaceChildren(...list.map((d) => {
+      const actions = el("div", { class: "doc-actions" });
+      const askRemove = () => actions.replaceChildren(
+        el("span", { class: "muted" }, "Remove?"),
+        el("button", { class: "link danger", type: "button", onclick: () => removeDoc(d) }, "Yes, remove"),
+        el("button", { class: "link quiet", type: "button", onclick: () => actions.replaceChildren(removeBtn()) }, "Cancel"));
+      const removeBtn = () => el("button", { class: "link quiet", type: "button", onclick: askRemove, "aria-label": `Remove ${d.name}` }, "Remove");
+      actions.append(removeBtn());
+      return el("li", { class: "doc" },
+        el("div", { class: "doc-name" }, el("b", null, d.name),
+          el("span", null, `${d.dates ? plural(d.dates, "date") + " found" : "No dates found"} · ${mb(d.size)}`)),
+        actions);
+    }));
+  }
+
+  async function refreshDocs() {
+    const data = await api("GET", "/api/documents");
+    renderDocs(data.documents, data.usage);
+  }
+
+  function summarise(s) {
+    const parts = [];
+    if (s.added && s.added.length) parts.push(`${plural(s.added.length, "document")} added`);
+    if (s.updated && s.updated.length) parts.push(`${s.updated.length} updated`);
+    if (s.removed && s.removed.length) parts.push(`${s.removed.length} removed`);
+    if (s.skipped && s.skipped.length) parts.push(`${s.skipped.length} skipped (${s.skipped.map((k) => `${k.name}: ${k.reason}`).join("; ")})`);
+    return parts.length ? parts.join(", ") + "." : "No changes.";
+  }
+
+  async function uploadFile(file) {
+    if (!file) return;
+    const done = busy($("addBtn"), `Adding ${file.name}…`);
+    say("docsNote", "Reading it for dates. This takes a few seconds.");
+    try {
+      const data = await api("POST", "/api/upload", file, { "X-Filename": encodeURIComponent(file.name) });
+      renderDocs(data.documents, data.usage);
+      say("docsNote", `${file.name} added. ${summarise(data.summary)}`);
+      await refreshDue();
+    } catch (err) {
+      say("docsNote", err.message, true);
+    } finally {
+      done();
+      $("file").value = "";
+    }
+  }
+
+  async function addSamples() {
+    say("docsNote", "Adding 8 made-up sample documents…");
+    try {
+      const data = await api("POST", "/api/samples");
+      renderDocs(data.documents, data.usage);
+      say("docsNote", "Sample documents added. They are made up, so feel free to remove them.");
+      await refreshDue();
+    } catch (err) {
+      say("docsNote", err.message, true);
+    }
+  }
+
+  async function removeDoc(d) {
+    say("docsNote", `Removing ${d.name}…`);
+    try {
+      const data = await api("POST", `/api/documents/${encodeURIComponent(d.id)}/delete`);
+      renderDocs(data.documents, data.usage);
+      say("docsNote", `${d.name} removed.`);
+      await refreshDue();
+    } catch (err) {
+      say("docsNote", err.message, true);
+    }
+  }
+
+  $("addBtn").addEventListener("click", () => $("file").click());
+  $("file").addEventListener("change", () => uploadFile($("file").files[0]));
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => uploadFile(e.dataTransfer.files[0]));
+
+  $("syncBtn").addEventListener("click", async () => {
+    const done = busy($("syncBtn"), "Checking…");
+    try {
+      const data = await api("POST", "/api/sync");
+      renderDocs(data.documents, data.usage);
+      say("docsNote", `Checked Box. ${summarise(data.summary)}`);
+      await refreshDue();
+    } catch (err) {
+      say("docsNote", err.message, true);
+    } finally {
+      done();
+    }
+  });
+
+  // ---------- reminders ----------
+
+  function renderReminders() {
+    $("remSwitch").setAttribute("aria-checked", String(me.reminders));
+    $("remTo").textContent = me.reminders ? ` Each morning, to ${me.email}, when something is due within a week.` : " Off. Turn on to get a morning email when something is due within a week.";
+  }
+
+  $("remSwitch").addEventListener("click", async () => {
+    const want = !me.reminders;
+    try {
+      const data = await api("POST", "/api/settings", { reminders: want });
+      me.reminders = data.reminders;
+      renderReminders();
+      say("remNote", me.reminders ? "Reminders are on." : "Reminders are off.");
+    } catch (err) {
+      say("remNote", err.message, true);
+    }
+  });
+
+  $("testBtn").addEventListener("click", async () => {
+    const done = busy($("testBtn"), "Sending…");
+    try {
+      const data = await api("POST", "/api/digest/test");
+      say("remNote", data.result === "sent" ? `Sent to ${data.email}. Check your inbox (and spam).` : "Nothing is due in the next week, so there's nothing to send.");
+    } catch (err) {
+      say("remNote", err.message, true);
+    } finally {
+      done();
+    }
+  });
+
+  // ---------- ask ----------
+
+  function passage(text) {
+    const [lead, ...rest] = text.split("\n");
+    const body = rest.join("\n").trim();
+    const blocks = body ? body.split(/\n\s*\n/).flatMap((p) => p.replace(/\n(?!\s*(?:[-*+]|\d+[.)])\s)/g, " ").split("\n")) : [];
+    return [el("p", { class: "lead" }, lead), ...blocks.map((b) => el("p", null, b.trim()))];
+  }
+
+  function renderAnswer(d) {
+    if (!d.answered) {
+      return el("div", { class: "card answer rise" },
+        el("div", { class: "from" }, el("b", null, "No answer found")),
+        el("p", { class: "label" }, "None of your documents answer this, so roost won't guess."));
+    }
+    const due = d.due ? parseDay(d.due) : null;
+    const days = due ? Math.round((due - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000) : null;
+    const fact = (label, value, small) => el("div", { class: "fact" }, el("dt", null, label), el("dd", null, value, small ? el("small", null, small) : null));
+    return el("div", { class: "card answer rise" },
+      el("div", { class: "from" }, el("span", null, "From ", el("b", null, d.source_file))),
+      el("p", { class: "label" }, "What to do"),
+      d.action_item ? el("p", { class: "todo" }, el("mark", null, d.action_item)) : el("p", { class: "todo muted" }, "Nothing to do. This file has no to-do list."),
+      el("dl", { class: "facts" },
+        fact("How urgent", URGENCY[d.priority]),
+        fact("Due by", due ? `${due.getDate()} ${MONTHS[due.getMonth()]} ${due.getFullYear()}` : "No date", due ? when(days) : null),
+        fact("Next step", NEXT[d.next_action]),
+        fact("Type", TYPE[d.category] || d.category)),
+      d.evidence ? el("div", { class: "quote" }, passage(d.evidence)) : null);
+  }
+
+  async function ask(question) {
+    question = question.trim();
+    if (!question) { say("askNote", "Type a question first."); return; }
+    const done = busy($("askBtn"), "Looking…");
+    say("askNote", "");
+    try {
+      $("answer").replaceChildren(renderAnswer(await api("GET", `/api/ask?q=${encodeURIComponent(question)}`)));
+    } catch (err) {
+      say("askNote", err.message, true);
+    } finally {
+      done();
+    }
+  }
+
+  $("askForm").addEventListener("submit", (e) => { e.preventDefault(); ask($("q").value); });
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask($("q").value); } });
+
+  // ---------- account ----------
+
+  function renderDelete() {
+    const actions = $("delActions");
+    const start = el("button", { class: "pill danger", type: "button", onclick: confirmDelete }, "Delete my account");
+    actions.replaceChildren(start);
+    return start;
+  }
+
+  function confirmDelete() {
+    const yes = el("button", { class: "pill danger", type: "button", onclick: () => deleteAccount(yes) }, "Yes, delete everything");
+    const no = el("button", { class: "link quiet", type: "button", onclick: () => { renderDelete().focus(); say("delNote", ""); } }, "Cancel");
+    $("delActions").replaceChildren(yes, no);
+    say("delNote", `This deletes ${me.email} and its ${plural(docs.length, "document")}.`);
+    yes.focus();
+  }
+
+  async function deleteAccount(button) {
+    busy(button, "Deleting…");
+    say("delNote", "");
+    try {
+      await api("POST", "/api/account/delete");
+      me = null;
+      render();
+      window.scrollTo(0, 0);
+      say("signinNote", "Your account is deleted, along with your documents. You can sign up again any time.");
+    } catch (err) {
+      renderDelete();
+      say("delNote", err.message, true);
+    }
+  }
+
+  // ---------- views ----------
+
+  function render() {
+    const signedIn = Boolean(me && me.signed_in);
+    $("outView").hidden = signedIn;
+    $("inView").hidden = !signedIn;
+    $("who").hidden = !signedIn;
+    if (!signedIn) {
+      $("codeForm").hidden = true;
+      $("emailForm").hidden = false;
+      return;
+    }
+    $("whoEmail").textContent = me.email;
+    renderReminders();
+    renderDelete();
+    say("delNote", "");
+  }
+
+  async function load() {
+    try {
+      me = await api("GET", "/api/me");
+    } catch (err) {
+      me = null;
+      render();
+      say("signinNote", err.message, true);
+      return;
+    }
+    render();
+    if (me.signed_in) {
+      await refreshDocs().catch((err) => say("docsNote", err.message, true));
+      await refreshDue();
+    } else {
+      const params = new URLSearchParams(location.search);
+      if (params.get("signin") === "expired") say("signinNote", "That sign-in link has expired or was already used. Ask for a new code below.", true);
+      if (me.full) say("signinNote", "roost is full right now. It's a small demo with room for 40 people.", true);
+    }
+    if (location.search) history.replaceState(null, "", "/");
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

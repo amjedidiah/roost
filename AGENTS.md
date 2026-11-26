@@ -14,11 +14,12 @@ python3 -m unittest tests.test_ingest.IngestTest.test_second_run_is_a_no_op   # 
 ./scripts/deploy.sh                                              # push *.py to the Sprite and restart the service
 ./scripts/create-index.sh                                        # one-time: create the roost-nest index with the .env key
 ./scripts/set-token.sh                                           # create ROOST_TOKEN in .env (if missing), install its hash on the Sprite
+./scripts/smoke.sh                                               # live pass on the Sprite that deletes its own account (once per code version; --force)
 curl -X POST -H "X-Roost-Token: $ROOST_TOKEN" https://roost-b6xbd.sprites.app/ingest   # run ingest
 curl -G -H "X-Roost-Token: $ROOST_TOKEN" --data-urlencode "q=when does my car insurance renew" https://roost-b6xbd.sprites.app/ask
 ```
 
-**Auth:** `/ingest` (and `/ask`) require the `X-Roost-Token` header. The token lives only in the local `.env`; the Sprite keeps just its SHA-256 in `data/token.sha256` and fails closed (503) without it. `/` and `/healthz` are open.
+**Auth:** `/ingest`, `/ask` and `/nest` require the `X-Roost-Token` header. The token lives only in the local `.env`; the Sprite keeps just its SHA-256 in `data/token.sha256` and fails closed (503) without it. `/`, `/healthz` and `/assets/*` are open.
 
 The gateway only works from inside the Sprite, so anything that touches Box or Pinecone must run there (`sprite exec --no-stdin -- sh -c 'cd /home/sprite/roost && python3 ...'`). Local Python is 3.9; the Sprite has 3.13, so keep code 3.9-compatible.
 
@@ -32,12 +33,20 @@ Deadline: midnight PST Sun Nov 29 2026 (08:00 WAT Mon Nov 30). Sprite + connecto
 
 Single service, two endpoints:
 
+Web UI: `web/index.html` is one self-contained page (inline CSS + vanilla JS, no build) served at `GET /` with a strict CSP (`default-src 'none'`, self only); font in `web/assets/`. It calls `GET /ask`, `POST /ingest` and `GET /nest` (token-protected, read-only list of files from `nest.json`). Render document text with `textContent` only, never `innerHTML`. Design decisions live in `PRODUCT.md`, `DESIGN.md` and `.impeccable/surfaces/web-index-html.md` (Swiss Data Sheet direction): yellow `#ffd60a` is reserved for the action line, priority is shown by the square mark's form, and tabular figures apply only to dates (in Schibsted they also widen `.` and `,`).
+
 Modules: `auth.py` (shared-secret check), `gateway.py` (connection discovery + keyless HTTP), `box.py`, `nest.py` (Pinecone), `ingest.py` (chunking + sync logic), `decide.py` (rules engine, pure), `ask.py` (search + decide + history), `service.py` (HTTP).
 
 - `POST /ingest` — lists Box folder `roost/`, downloads `.md`/`.markdown`/`.txt` files, splits them into heading-prefixed chunks (≤1200 chars), embeds them through the connector's `/embed` (`llama-text-embed-v2`, 1024 dims), and upserts plain vectors to Pinecone index **`roost-nest`**, namespace `me`. Vector ids are `<box_file_id>#<chunk_index>`; metadata holds `file_id`, `file_name`, `chunk_index`, `chunk_text`, `modified_at`. `data/nest.json` (on the Sprite, gitignored) records each file's Box `sha1`, name and chunk count: unchanged files are skipped, changed files are re-embedded and their surplus chunk ids deleted, and files gone from Box have all their chunks deleted. A lock returns 409 if an ingest is already running.
 - `GET /ask?q=...` — embeds `q` (`input_type: query`), queries top 8, and if the best score is ≥ `ROOST_ANSWER_THRESHOLD` (0.28) fetches every chunk of that file (count from `nest.json`) so dates and to-dos outside the matched chunks count. `decide.py` then fills the schema; the result is appended to `data/history/YYYY-MM-DD.jsonl`.
 
 **Decision engine (`decide.py`):** fixed rules, no model; `decide()` is pure and takes `today`. `answered` = score threshold. `category` = keyword counts over file name + text (enum in `CATEGORIES`). `action_item` = the bullet under a To do / Next steps / Follow-ups heading with the most question-word overlap; ties go to the most urgent (own date, or "this week"/"asap" ≈ 7 days), then bolded. `due` = the action item's own date only (another date in the file would mislabel it), or the file's next date when there is no action item. `priority` = ≤7 days high, ≤30 medium, else low; undated urgent wording → high. `next_action` = none / review / act_now (high) / follow_up (chase, call, confirm…) / schedule. Date parsing only matches within one line (`[ \t]`, not `\s`) so a heading date can't join a numbered list item. `summary` is a template over these fields.
+
+## After judging (Dec 1 2026)
+
+All user data must be deleted after judging (the page promises it):
+1. `POST /internal/delete-user` with `{"all": true}` and the `X-Roost-Token` header: empties every user's Box files, clears their Pinecone namespaces, removes their state and accounts.
+2. **Then delete the `roost/users` folder in the Box web app.** The connector can't delete or rename, so step 1 leaves empty files (with their original names) and the per-user folders, including `roost/users/_probe`.
 
 ## Hard constraints
 

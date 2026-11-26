@@ -22,6 +22,9 @@ FETCH_BATCH = 100
 
 
 class Nest:
+    def __init__(self, namespace=None):
+        self.namespace = namespace or NAMESPACE
+
     def _post(self, path, body):
         return gateway.request(
             "POST",
@@ -46,18 +49,26 @@ class Nest:
         """records: [{"id", "values", "metadata"}]."""
         for i in range(0, len(records), UPSERT_BATCH):
             self._post(f"/indexes/{INDEX}/vectors/upsert",
-                       {"vectors": records[i:i + UPSERT_BATCH], "namespace": NAMESPACE})
+                       {"vectors": records[i:i + UPSERT_BATCH], "namespace": self.namespace})
 
     def delete(self, ids):
         for i in range(0, len(ids), DELETE_BATCH):
             self._post(f"/indexes/{INDEX}/vectors/delete",
-                       {"ids": ids[i:i + DELETE_BATCH], "namespace": NAMESPACE})
+                       {"ids": ids[i:i + DELETE_BATCH], "namespace": self.namespace})
+
+    def clear(self):
+        """Delete every vector in this namespace. A namespace that was never written is fine."""
+        try:
+            self._post(f"/indexes/{INDEX}/vectors/delete", {"deleteAll": True, "namespace": self.namespace})
+        except gateway.GatewayError as e:
+            if e.status != 404:
+                raise
 
     def fetch(self, ids):
         """Fetch vectors by id. Returns {id: {"id", "values", "metadata"}}; missing ids are absent."""
         found = {}
         for i in range(0, len(ids), FETCH_BATCH):
-            params = urllib.parse.urlencode({"ids": ids[i:i + FETCH_BATCH], "namespace": NAMESPACE}, doseq=True)
+            params = urllib.parse.urlencode({"ids": ids[i:i + FETCH_BATCH], "namespace": self.namespace}, doseq=True)
             resp = gateway.request(
                 "GET",
                 f"{gateway.base_url('pinecone')}/indexes/{INDEX}/vectors/fetch?{params}",
@@ -68,6 +79,6 @@ class Nest:
 
     def query(self, vector, top_k=5):
         resp = self._post(f"/indexes/{INDEX}/query", {
-            "namespace": NAMESPACE, "vector": vector, "topK": top_k, "includeMetadata": True,
+            "namespace": self.namespace, "vector": vector, "topK": top_k, "includeMetadata": True,
         })
         return resp.get("matches", [])

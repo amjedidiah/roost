@@ -5,3 +5,6 @@ __pycache__/
 .DS_Store
 .sprite
 data/
+.impeccable/review/
+.impeccable/questions/
+.impeccable/build/

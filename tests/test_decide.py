@@ -34,6 +34,7 @@ class DecideSamplesTest(unittest.TestCase):
         self.assertEqual((d["category"], d["priority"], d["next_action"], d["due"]),
                          ("home", "high", "act_now", "2026-12-02"))
         self.assertIn("notice deadline", d["action_item"])
+        self.assertEqual(d["action_from"], "To do")
 
     def test_car_insurance_is_a_follow_up_call(self):
         d = decide("when does my car insurance renew", *sample("car-insurance-renewal.md"), TODAY)
@@ -52,6 +53,7 @@ class DecideSamplesTest(unittest.TestCase):
         d = decide("how long should sourdough proof", *sample("sourdough-recipe.md"), TODAY)
         self.check_schema(d)
         self.assertEqual((d["category"], d["next_action"], d["action_item"]), ("personal", "review", None))
+        self.assertIsNone(d["action_from"])
 
     def test_trip_and_warranty_categories(self):
         self.assertEqual(decide("trip", *sample("lisbon-trip-itinerary.md"), TODAY)["category"], "travel")

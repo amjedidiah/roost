@@ -6,6 +6,8 @@ The Sprite holds no partner credentials. Every Box and Pinecone call goes throug
 
 Built for [Hacksgiving 2026](https://fly.io/hacksgiving/).
 
+**Try it:** open https://roost-b6xbd.sprites.app, paste a roost token (ask the author for one), and pick a question. The page shows each answer as a data sheet: numbered fields, the action line highlighted, and the passage it came from. Every question also works through the API:
+
 ```console
 $ curl -G -H "X-Roost-Token: $ROOST_TOKEN" --data-urlencode "q=when does my car insurance renew" \
     https://roost-b6xbd.sprites.app/ask
@@ -59,7 +61,8 @@ flowchart LR
   | `summary` | a template over the fields above |
 
   No model means no cost per question, the same answer every time, and none of your document text leaving Box and Pinecone.
-- **Auth:** `/ingest` and `/ask` require an `X-Roost-Token` header. The token stays on your laptop. The Sprite stores only its SHA-256, and `/ingest` and `/ask` return 503 until one is installed. `/healthz` is open.
+- **Web page (`GET /`):** one HTML file ([`web/index.html`](web/index.html)) with inline CSS and plain JavaScript, served by the same stdlib server, with no build step. Paste the token once (it stays in your browser), then ask or pick a sample question. `?q=...` in the URL asks on load. The nest list and Re-ingest are in the top bar. The typeface is [Schibsted Grotesk](https://github.com/schibsted/schibsted-grotesk) (SIL OFL 1.1), served from `web/assets/`.
+- **Auth:** `/ingest`, `/ask` and `/nest` require an `X-Roost-Token` header. The token stays on your laptop. The Sprite stores only its SHA-256, and the protected endpoints return 503 until one is installed. `/`, `/healthz` and the font are open.
 
 ## Connectors used
 
@@ -86,9 +89,9 @@ You need a Fly.io account with the [`sprite` CLI](https://docs.fly.io/sprites), 
    ```sh
    sprite login
    sprite create --skip-console --label env=hacksgiving roost && sprite use roost
-   sprite exec --no-stdin -- mkdir -p /home/sprite/roost
-   for f in service.py auth.py gateway.py box.py nest.py ingest.py decide.py ask.py; do
-     sprite file push "$f" "/home/sprite/roost/$f"
+   for f in service.py auth.py gateway.py box.py nest.py ingest.py decide.py ask.py \
+            web/index.html web/assets/schibsted-grotesk.woff2 web/assets/OFL.txt; do
+     sprite file push -p "$f" "/home/sprite/roost/$f"
    done
    sprite exec --no-stdin -- sprite-env services create roost --cmd python3 \
      --args /home/sprite/roost/service.py --dir /home/sprite/roost --http-port 8080
@@ -99,7 +102,7 @@ You need a Fly.io account with the [`sprite` CLI](https://docs.fly.io/sprites), 
 3. **Create the index:** put `PINECONE_API_KEY=...` in a local `.env` (gitignored), then run `./scripts/create-index.sh`.
 4. **Add documents:** create a folder called `roost` in your Box root and upload some `.md` or `.txt` files. [`sample-docs/`](sample-docs) has eight fictional ones.
 5. **Set the token:** `./scripts/set-token.sh` puts `ROOST_TOKEN` in `.env` and installs its hash on the Sprite.
-6. **Use it:**
+6. **Use it:** open your Sprite's URL in a browser and paste the token, or use curl:
 
    ```sh
    export ROOST_TOKEN=$(grep '^ROOST_TOKEN=' .env | cut -d= -f2-)
@@ -115,13 +118,14 @@ After changing the code, `./scripts/deploy.sh` pushes it and restarts the servic
 python3 -m unittest discover -s tests -t .
 ```
 
-The 32 tests use fake Box and Pinecone clients, so they need no network. They cover ingest syncing (adds, edits, renames, deletions, re-runs that change nothing), chunking, date parsing, auth, and the rules engine run against the sample documents.
+The 38 tests need no network: Box and Pinecone are faked. They cover ingest syncing (adds, edits, renames, deletions, re-runs that change nothing), chunking, date parsing, auth, the rules engine run against the sample documents, and the HTTP routes (page, font, `/nest`, `HEAD`, 404).
 
 ## Layout
 
 | File | Role |
 | --- | --- |
-| `service.py` | HTTP server (stdlib `http.server`), routes, error mapping |
+| `service.py` | HTTP server (stdlib `http.server`), routes, error mapping, page security headers |
+| `web/index.html` | the web page: token, question, decision sheet, nest list, re-ingest |
 | `auth.py` | `X-Roost-Token` check against the stored hash |
 | `gateway.py` | connector discovery and keyless HTTP calls |
 | `box.py`, `nest.py` | Box and Pinecone clients |
